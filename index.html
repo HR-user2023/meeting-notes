@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>會議記錄系統</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one centered working column (max 960px) under a sticky top bar; views switch by hash */
+:root{
+  --bg:#F4F4F4; --surface:#FFFFFF; --sunk:#F8F8F8; --line:#E2E2E2; --line-strong:#C6C6C6;
+  --fg:#171717; --muted:#5C5C5C; --accent:#171717; --accent-ink:#171717; --accent-soft:#EBEBEB; --on-accent:#FFFFFF;
+  --warn:#333333; --warn-soft:#EBEBEB; --bad:#171717; --bad-soft:#DCDCDC; --good:#5C5C5C; --good-soft:#F2F2F2;
+  --font-body:"Noto Sans TC","Inter",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --font-num:"Inter","Noto Sans TC",system-ui,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111111; --surface:#1B1B1B; --sunk:#161616; --line:#2D2D2D; --line-strong:#454545;
+  --fg:#EDEDED; --muted:#A6A6A6; --accent:#EDEDED; --accent-ink:#EDEDED; --accent-soft:#2A2A2A; --on-accent:#111111;
+  --warn:#D6D6D6; --warn-soft:#282828; --bad:#EDEDED; --bad-soft:#383838; --good:#A6A6A6; --good-soft:#202020;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111111; --surface:#1B1B1B; --sunk:#161616; --line:#2D2D2D; --line-strong:#454545;
+  --fg:#EDEDED; --muted:#A6A6A6; --accent:#EDEDED; --accent-ink:#EDEDED; --accent-soft:#2A2A2A; --on-accent:#111111;
+  --warn:#D6D6D6; --warn-soft:#282828; --bad:#EDEDED; --bad-soft:#383838; --good:#A6A6A6; --good-soft:#202020;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.6}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{max-width:960px;margin:0 auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;text-decoration:none;color:var(--fg)}
+.brand svg{flex:none}
+.nav{display:flex;flex-wrap:wrap;gap:8px}
+main{max-width:960px;margin:0 auto;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font-size:26px;line-height:1.3;text-wrap:balance}
+h2{margin:0;font-size:17px;line-height:1.4}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.btn{min-height:44px;padding:0 16px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--fg);display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn-ghost{border-color:transparent;background:transparent}
+.btn-link{color:var(--accent);font-weight:600}
+.btn-danger{color:var(--bad)}
+.btn-danger.armed{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.icon-btn{width:44px;height:44px;flex:none;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-size:15px}
+.icon-btn:hover{background:var(--sunk);color:var(--bad)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.panel-head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.panel-head .t{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:13px;font-weight:500;color:var(--muted)}
+.in{min-height:44px;width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:0 12px;background:var(--surface);font-size:15px}
+textarea.in{padding:10px 12px;min-height:80px;resize:vertical}
+select.in{padding:0 8px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.span2{grid-column:1/-1}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap;background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pill.bad{background:var(--fg);color:var(--bg);border-color:transparent}
+.pill.good{background:transparent;color:var(--muted);border-color:var(--line-strong)}
+.pill.acc{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-family:var(--font-num);font-size:28px;line-height:1.2;font-variant-numeric:tabular-nums}
+.stat.warn b{color:var(--warn)} .stat.bad b{color:var(--bad)}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.toolbar .in{flex:1 1 260px;width:auto}
+.mlist{display:flex;flex-direction:column;gap:10px}
+.mcard{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px;text-decoration:none;color:var(--fg)}
+.mcard:hover{border-color:var(--accent)}
+.mcard .l{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 280px}
+.mcard .ttl{font-size:17px;font-weight:600}
+.mcard .r{display:flex;flex-wrap:wrap;gap:6px}
+.date-group{font-size:13px;font-weight:600;color:var(--muted);margin-top:6px}
+.empty{background:var(--surface);border:1px dashed var(--line-strong);border-radius:12px;padding:32px 20px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.notice{border-radius:12px;padding:12px 16px;background:var(--warn-soft);color:var(--warn);font-size:14px}
+.save-state{font-size:13px;color:var(--muted)}
+.save-state.err{color:var(--bad)}
+/* templates */
+.tpls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tpl{text-align:left;min-height:84px;padding:12px 14px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.tpl[aria-pressed="true"]{border:2px solid var(--accent);background:var(--accent-soft)}
+.tpl b{font-size:15px}
+/* topics */
+.toc{display:flex;flex-wrap:wrap;gap:6px}
+.toc a{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line-strong);text-decoration:none;color:var(--fg);background:var(--surface)}
+.toc a:hover{border-color:var(--accent)}
+.topic{background:var(--sunk);border:1px solid var(--line);border-radius:var(--r);scroll-margin-top:80px}
+.topic-h{width:100%;min-height:54px;border:0;background:transparent;text-align:left;padding:10px 14px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;cursor:pointer}
+.topic-h .no{font-size:13px;font-weight:700;color:var(--accent);font-family:var(--font-num)}
+.topic-h .tt{font-size:16px;font-weight:600;flex:1 1 180px;min-width:0}
+.topic-h .arr{color:var(--muted);width:16px;text-align:center}
+.topic-b{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px}
+.topic-row{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:10px}
+.notes{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
+.notes li{display:flex;gap:6px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px 2px 2px 12px}
+.notes li span{flex:1;padding:9px 0;min-width:0;overflow-wrap:anywhere}
+.addline{display:flex;flex-wrap:wrap;gap:8px}
+.addline .in{flex:1 1 220px;width:auto}
+/* decisions */
+.dec-head,.dec{display:grid;grid-template-columns:minmax(0,1fr) 150px 120px 120px 44px;gap:8px;align-items:center}
+.dec-head{font-size:13px;color:var(--muted);padding:0 2px}
+.dec{padding:6px 0;border-top:1px solid var(--line)}
+.carry{display:flex;flex-direction:column;gap:6px}
+.carry-row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px 6px 12px}
+.carry-row .tx{flex:1 1 240px;min-width:0}
+.carry-row select{width:auto;min-width:110px}
+.panel.carry-panel{background:var(--warn-soft);border-color:transparent}
+.panel.carry-panel h2{color:var(--warn)}
+/* todos page */
+.todo{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.todo .tx{flex:1 1 260px;min-width:0;display:flex;flex-direction:column}
+.todo .tx b{font-weight:600}
+.todo select{width:auto;min-width:110px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tab[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:720px){
+  .tpls{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .topic-row{grid-template-columns:minmax(0,1fr)}
+  .dec-head{display:none}
+  .dec{grid-template-columns:repeat(2,minmax(0,1fr)) 44px}
+  .dec>.d-text{grid-column:1/3}
+  .dec>.d-del{grid-row:1;grid-column:3}
+  .stats .stat b{font-size:22px}
+}
+@media (max-width:440px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}.stats{gap:8px}.stat{padding:10px 12px}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <a class="brand" href="#list"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>會議記錄</a>
+  <nav class="nav" aria-label="主要">
+    <a class="btn" href="#list" id="navList">會議列表</a>
+    <a class="btn" href="#todos" id="navTodos">待辦總覽</a>
+    <a class="btn btn-primary" href="#new">＋ 新增會議</a>
+  </nav>
+</div></header>
+<main id="app">
+  <div class="empty"><b>正在載入會議記錄…</b><span class="muted small">稍等一下，資料讀取中。</span></div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+const TEMPLATES = {
+  weekly:{name:'每週專案會議',topics:[['上週進度回顧',10],['本週工作重點',15],['問題與支援',10],['其他事項',5]]},
+  monthly:{name:'部門月會',topics:[['本月工作回顧',20],['下月工作計畫',20],['部門公告',10],['其他事項',5]]},
+  client:{name:'客戶會議',topics:[['需求確認',20],['進度說明',15],['下一步與時程',10]]},
+  blank:{name:'空白',topics:[]}
+};
+const TOPIC_STATUS = ['未討論','已討論','延到下次'];
+const TODO_STATUS = ['未開始','進行中','已完成'];
+const MIN_OPTS = [5,10,15,20,30,45,60];
+const WD = ['日','一','二','三','四','五','六'];
+const clientId = Math.random().toString(36).slice(2);
+const app = document.getElementById('app');
+
+let db = null, dl = null, dbState = 'loading';
+let meetings = [];
+let cur = null, curId = null, saveTimer = null, saveState = '';
+let open = {};            // topic id -> open (editor UI)
+let search = '';
+let todoTab = 'open';
+let draft = null;
+let armedDelete = false;
+
+/* ---------- helpers ---------- */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const clone = o => JSON.parse(JSON.stringify(o));
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function parseD(s){if(!s)return null;const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+function fmtDate(s){const d=parseD(s);if(!d)return '未定';return (d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）';}
+function fmtFull(s){const d=parseD(s);if(!d)return '日期未定';return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()+'（'+WD[d.getDay()]+'）';}
+function daysFrom(s){const d=parseD(s);if(!d)return null;const t=parseD(todayStr());return Math.round((d-t)/86400000);}
+function isTodo(d){return d && String(d.owner||'').trim()!=='';}
+function dueInfo(dec){
+  if(dec.status==='已完成') return {cls:'good',txt:'已完成',key:'done'};
+  const n=daysFrom(dec.due);
+  if(n===null) return {cls:'',txt:'未定期限',key:'later'};
+  if(n<0) return {cls:'bad',txt:fmtDate(dec.due)+' · 逾期 '+(-n)+' 天',key:'overdue'};
+  if(n<=7) return {cls:'warn',txt:fmtDate(dec.due)+(n===0?' · 今天':' · 剩 '+n+' 天'),key:'week'};
+  return {cls:'',txt:fmtDate(dec.due),key:'later'};
+}
+function meetingNo(m){return 'M-'+String(m.date||'').replace(/-/g,'').slice(2)+'-'+String(m.id).slice(-4);}
+function sortedMeetings(){return meetings.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)-(a.createdAt||0));}
+function allTodos(){
+  const out=[];
+  meetings.forEach(m=>(m.decisions||[]).forEach(d=>{if(isTodo(d))out.push({m,d});}));
+  return out;
+}
+function previousMeeting(dateStr){
+  return sortedMeetings().find(m=>(m.date||'')<=(dateStr||'9999'));
+}
+function minOptions(sel){return MIN_OPTS.map(n=>'<option value="'+n+'"'+(Number(sel)===n?' selected':'')+'>'+n+' 分鐘</option>').join('');}
+function opts(list,sel,blankLabel){return (blankLabel!==undefined?'<option value=""'+(!sel?' selected':'')+'>'+blankLabel+'</option>':'')+list.map(v=>'<option'+(v===sel?' selected':'')+'>'+v+'</option>').join('');}
+function getPath(obj,path){return path.split('.').reduce((o,k)=>o==null?o:o[k],obj);}
+function setPath(obj,path,val){const ks=path.split('.');const last=ks.pop();const t=ks.reduce((o,k)=>o[k],obj);t[last]=val;}
+
+/* ---------- data ---------- */
+const API_URL = '__API_URL__';
+const CACHE_KEY = 'meeting-cache-v1';
+let pending = {}, failed = {}, pendingDel = {}, refreshing = false;
+function apiReady(){return /^https:\/\/script\.google\.com\//.test(API_URL);}
+async function apiList(){
+  const r=await fetch(API_URL+'?action=list&t='+Date.now(),{cache:'no-store'});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error||'list failed'); return j.meetings||[];
+}
+async function apiPost(body){
+  const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});
+  const j=await r.json(); if(!j.ok) throw new Error(j.error||'save failed'); return j;
+}
+function saveCache(){try{localStorage.setItem(CACHE_KEY,JSON.stringify(meetings));}catch(e){}}
+function loadCache(){try{const s=localStorage.getItem(CACHE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+function mergeServer(list){
+  const map={};
+  list.forEach(m=>{if(m&&m.id&&!pendingDel[m.id])map[m.id]=m;});
+  Object.keys(pending).forEach(id=>{map[id]=pending[id];});
+  if(cur&&saveTimer) map[cur.id]=clone(cur);
+  return Object.values(map);
+}
+function flushFailed(){
+  Object.keys(failed).forEach(id=>{
+    const b=pending[id]; delete failed[id]; if(!b) return;
+    apiPost({action:'save',meeting:b}).then(()=>{if(pending[id]===b)delete pending[id];}).catch(()=>{failed[id]=true;});
+  });
+}
+async function refresh(){
+  if(!apiReady()||refreshing) return;
+  refreshing=true;
+  try{
+    const list=await apiList();
+    meetings=mergeServer(list); dbState='on'; saveCache(); onData(); flushFailed();
+  }catch(e){
+    if(dbState!=='on'){dbState='off';render();}
+  }finally{refreshing=false;}
+}
+function startDb(){
+  dl=true;
+  if(!apiReady()){dbState='setup';render();return;}
+  const c=loadCache();
+  if(c){meetings=c;dbState='on';render();}
+  refresh();
+  setInterval(()=>{if(document.visibilityState==='visible')refresh();},20000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh();});
+}
+function onData(){
+  const r=route();
+  if(r.view==='meeting'){
+    const m=meetings.find(x=>x.id===r.id);
+    if(!m){ render(); return; }
+    if(!cur || cur.id!==m.id){cur=clone(m);render();return;}
+    if(m.updatedBy!==clientId && !saveTimer && (m.updatedAt||0)>(cur.updatedAt||0)){cur=clone(m);render();}
+    else refreshCarry();
+    return;
+  }
+  if(r.view==='new') return;
+  const a=document.activeElement;
+  if(a&&a.hasAttribute&&(a.hasAttribute('data-search')||a.tagName==='SELECT')) {const ml=document.getElementById('mlist');if(ml&&a.hasAttribute('data-search'))ml.innerHTML=listBody();return;}
+  render();
+}
+function scheduleSave(){
+  if(!cur) return;
+  saveState='有變更，儲存中…';paintSave();
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(doSave,800);
+}
+async function doSave(){
+  saveTimer=null;
+  if(!cur) return;
+  try{await writeMeeting(cur);saveState='已存到 Google 試算表';paintSave();}
+  catch(e){saveState=String(e&&e.message||'').indexOf('太長')>=0?e.message:'暫時沒存到，連上網路後會自動再存';paintSave(true);}
+}
+async function writeMeeting(m){
+  const body=clone(m); body.updatedAt=Date.now(); body.updatedBy=clientId;
+  if(cur&&cur.id===body.id){cur.updatedAt=body.updatedAt;cur.updatedBy=clientId;}
+  const i=meetings.findIndex(x=>x.id===body.id); if(i>=0) meetings[i]=body; else meetings.push(body);
+  pending[body.id]=body; saveCache();
+  try{
+    if(!apiReady()) throw new Error('no api');
+    await apiPost({action:'save',meeting:body});
+    if(pending[body.id]===body) delete pending[body.id];
+  }catch(e){ failed[body.id]=true; throw e; }
+}
+
+/* ---------- routing ---------- */
+function route(){
+  const h=(location.hash||'').slice(1);
+  if(h==='todos') return {view:'todos'};
+  if(h==='new') return {view:'new'};
+  if(h.indexOf('m-')===0) return {view:'meeting',id:h.slice(2)};
+  return {view:'list'};
+}
+window.addEventListener('hashchange',()=>{
+  if(saveTimer){clearTimeout(saveTimer);doSave();}
+  const r=route();
+  if(r.view!=='meeting'){cur=null;curId=null;}
+  if(r.view!=='new') draft=null;
+  armedDelete=false;
+  render();window.scrollTo(0,0);
+});
+
+/* ---------- render ---------- */
+function render(){
+  const r=route();
+  document.getElementById('navList').classList.toggle('tab',true);
+  document.getElementById('navList').setAttribute('aria-pressed',r.view==='list');
+  document.getElementById('navTodos').classList.toggle('tab',true);
+  document.getElementById('navTodos').setAttribute('aria-pressed',r.view==='todos');
+  if(dbState==='loading'){app.innerHTML='<div class="empty"><b>正在載入會議記錄…</b><span class="muted small">稍等一下，資料讀取中。</span></div>';return;}
+  if(dbState==='setup'){app.innerHTML='<div class="empty"><b>還沒連上 Google 試算表</b><span class="muted small">設定完成後就能使用。</span></div>';return;}
+  const off=dbState==='off'?'<div class="notice">目前連不上 Google 試算表，請檢查網路後重新整理頁面。</div>':'';
+  if(r.view==='todos') app.innerHTML=off+viewTodos();
+  else if(r.view==='new') app.innerHTML=off+viewNew();
+  else if(r.view==='meeting'){
+    const m=meetings.find(x=>x.id===r.id)||(cur&&cur.id===r.id?cur:null);
+    if(!m){app.innerHTML=off+'<div class="empty"><b>找不到這場會議</b><span class="muted small">可能已經被刪除了。</span><a class="btn" href="#list">回到會議列表</a></div>';return;}
+    if(!cur||cur.id!==m.id){cur=clone(m);open={};(cur.topics||[]).slice(0,1).forEach(t=>open[t.id]=true);}
+    curId=cur.id;
+    app.innerHTML=off+viewMeeting();
+  }
+  else app.innerHTML=off+viewList();
+  refreshDownloadButtons();
+}
+
+/* list */
+function viewList(){
+  const today=todayStr(), ym=today.slice(0,7);
+  const todos=allTodos();
+  const openT=todos.filter(x=>x.d.status!=='已完成');
+  const overdue=openT.filter(x=>dueInfo(x.d).key==='overdue');
+  const monthCount=meetings.filter(m=>(m.date||'').slice(0,7)===ym).length;
+  let h='<div class="panel-head"><h1>會議列表</h1><button class="btn" data-act="dl-all"'+dlAttr()+'>⬇ 下載全部（Excel）</button></div>';
+  h+='<div class="stats"><div class="stat"><span class="small muted">本月會議</span><b>'+monthCount+'</b></div><div class="stat warn"><span class="small muted">待辦未完成</span><b>'+openT.length+'</b></div><div class="stat bad"><span class="small muted">已逾期</span><b>'+overdue.length+'</b></div></div>';
+  h+='<div class="toolbar"><label for="q" class="sr">搜尋會議</label><input id="q" class="in" type="search" placeholder="搜尋會議名稱、參加者、討論內容…" value="'+esc(search)+'" data-search></div>';
+  h+='<div id="mlist">'+listBody()+'</div>';
+  return h;
+}
+function listBody(){
+  if(!meetings.length) return '<div class="empty"><b>還沒有會議記錄</b><span class="muted">按「＋ 新增會議」建立第一場，選個範本就能開始記。</span><a class="btn btn-primary" href="#new">＋ 新增會議</a></div>';
+  const q=search.trim().toLowerCase();
+  const list=sortedMeetings().filter(m=>{
+    if(!q) return true;
+    const hay=[m.title,m.place,m.attendees,m.recorder].concat((m.topics||[]).map(t=>t.title+' '+(t.notes||[]).join(' '))).concat((m.decisions||[]).map(d=>d.text+' '+d.owner)).join(' ').toLowerCase();
+    return hay.indexOf(q)>=0;
+  });
+  if(!list.length) return '<div class="empty"><b>找不到符合「'+esc(search)+'」的會議</b><span class="muted small">換個關鍵字試試看。</span></div>';
+  let h='<div class="mlist">';let lastMonth='';
+  list.forEach(m=>{
+    const mo=(m.date||'').slice(0,7);
+    if(mo!==lastMonth){lastMonth=mo;h+='<div class="date-group">'+(mo?mo.replace('-',' 年 ')+' 月':'日期未定')+'</div>';}
+    const td=(m.decisions||[]).filter(isTodo);const openN=td.filter(d=>d.status!=='已完成').length;
+    const od=td.filter(d=>dueInfo(d).key==='overdue').length;
+    const ppl=String(m.attendees||'').split(/[、,，\s]+/).filter(Boolean).length;
+    let badge=td.length?(openN?'<span class="pill '+(od?'bad':'warn')+'">'+openN+' 項待辦'+(od?'・'+od+' 逾期':'')+'</span>':'<span class="pill good">待辦全部完成</span>'):'';
+    h+='<a class="mcard" href="#m-'+esc(m.id)+'"><div class="l"><span class="ttl">'+esc(m.title||'未命名會議')+'</span><span class="small muted">'+fmtDate(m.date)+(m.time?' '+esc(m.time):'')+(m.place?' · '+esc(m.place):'')+(ppl?' · '+ppl+' 人':'')+' · '+(m.topics||[]).length+' 個議題</span></div><div class="r">'+badge+'</div></a>';
+  });
+  return h+'</div>';
+}
+
+/* todos */
+function viewTodos(){
+  const todos=allTodos();
+  const groups={overdue:[],week:[],later:[],done:[]};
+  todos.forEach(x=>groups[dueInfo(x.d).key].push(x));
+  const byDue=(a,b)=>(a.d.due||'9999').localeCompare(b.d.due||'9999');
+  Object.values(groups).forEach(g=>g.sort(byDue));
+  const openCount=groups.overdue.length+groups.week.length+groups.later.length;
+  let h='<h1>待辦總覽</h1>';
+  h+='<div class="tabs"><button class="btn tab" data-act="todo-tab" data-v="open" aria-pressed="'+(todoTab==='open')+'">未完成（'+openCount+'）</button><button class="btn tab" data-act="todo-tab" data-v="done" aria-pressed="'+(todoTab==='done')+'">已完成（'+groups.done.length+'）</button></div>';
+  if(!todos.length) return h+'<div class="empty"><b>目前沒有待辦</b><span class="muted small">在會議記錄的「決議與待辦」填上負責人，就會出現在這裡。</span></div>';
+  const sec=(title,cls,list)=>list.length?'<section class="panel" style="padding:14px 16px"><h2 style="color:var(--'+cls+')">'+title+'（'+list.length+'）</h2>'+list.map(todoRow).join('')+'</section>':'';
+  if(todoTab==='open'){
+    if(!openCount) h+='<div class="empty"><b>待辦都完成了</b><span class="muted small">做得好。</span></div>';
+    h+=sec('已逾期','bad',groups.overdue)+sec('7 天內到期','warn',groups.week)+sec('之後','muted',groups.later);
+  } else h+=sec('已完成','good',groups.done);
+  return h;
+}
+function todoRow(x){
+  const di=dueInfo(x.d);const sid='ts-'+x.m.id+'-'+x.d.id;
+  return '<div class="todo"><div class="tx"><b>'+esc(x.d.text||'（未填內容）')+'</b><a class="small" href="#m-'+esc(x.m.id)+'">來自：'+fmtDate(x.m.date)+' '+esc(x.m.title||'')+'</a></div><span class="small">'+esc(x.d.owner)+'</span><span class="pill '+di.cls+'">'+esc(di.txt)+'</span><label class="sr" for="'+sid+'">狀態</label><select id="'+sid+'" class="in" data-todo-status data-mid="'+esc(x.m.id)+'" data-did="'+esc(x.d.id)+'">'+opts(TODO_STATUS,x.d.status||'未開始')+'</select></div>';
+}
+
+/* new meeting */
+function newDraft(){
+  const t=todayStr();
+  const prev=previousMeeting(t);
+  const d={tpl:'weekly',title:TEMPLATES.weekly.name,date:t,time:'14:00–15:00',place:prev?prev.place||'':'',attendees:prev?prev.attendees||'':'',recorder:'',topics:[],newTitle:'',newMin:'10'};
+  d.topics=TEMPLATES.weekly.topics.map(([n,mi])=>({id:rid(),title:n,min:mi}));
+  if(prev)(prev.topics||[]).filter(x=>x.status==='延到下次').forEach(x=>d.topics.push({id:rid(),title:x.title,min:x.min||10,carried:true}));
+  return d;
+}
+function viewNew(){
+  if(!draft) draft=newDraft();
+  const d=draft;
+  const prevTodos=allTodos().filter(x=>x.d.status!=='已完成');
+  let h='<div class="panel-head"><h1>新增會議</h1><a class="btn btn-ghost" href="#list">取消</a></div>';
+  h+='<section class="panel"><h2>1. 選擇範本</h2><div class="tpls">'+Object.entries(TEMPLATES).map(([k,v])=>'<button class="tpl" data-act="pick-tpl" data-v="'+k+'" aria-pressed="'+(d.tpl===k)+'"><b>'+v.name+'</b><span class="small muted">'+(v.topics.length?v.topics.length+' 個議題':'自己填議題')+'</span></button>').join('')+'</div></section>';
+  h+='<section class="panel"><h2>2. 會議資訊</h2><div class="grid3">'+
+    '<div class="field span2"><label for="n-title">會議名稱</label><input id="n-title" class="in" data-draft="title" value="'+esc(d.title)+'"></div>'+
+    '<div class="field"><label for="n-date">日期</label><input id="n-date" class="in" type="date" data-draft="date" value="'+esc(d.date)+'"></div>'+
+    '<div class="field"><label for="n-time">時間</label><input id="n-time" class="in" data-draft="time" value="'+esc(d.time)+'" placeholder="14:00–15:00"></div>'+
+    '<div class="field"><label for="n-place">地點</label><input id="n-place" class="in" data-draft="place" value="'+esc(d.place)+'" placeholder="會議室 A / 線上"></div>'+
+    '<div class="field"><label for="n-rec">記錄人</label><input id="n-rec" class="in" data-draft="recorder" value="'+esc(d.recorder)+'"></div>'+
+    '<div class="field span2" style="grid-column:1/-1"><label for="n-att">參加者（用頓號或逗號分開）</label><input id="n-att" class="in" data-draft="attendees" value="'+esc(d.attendees)+'" placeholder="王小明、陳美玲"></div>'+
+    '</div></section>';
+  h+='<section class="panel"><div class="panel-head"><h2>3. 議題</h2><span class="small muted num">共 '+d.topics.length+' 個議題</span></div>';
+  h+=d.topics.length?'<ul class="notes">'+d.topics.map((t,i)=>'<li><span><b class="num" style="color:var(--accent)">'+(i+1)+'.</b> '+esc(t.title)+(t.carried?' <span class="pill acc">上次延後</span>':'')+'</span><button class="icon-btn" aria-label="刪除議題 '+esc(t.title)+'" data-act="draft-del" data-i="'+i+'">✕</button></li>').join('')+'</ul>':'<p class="muted small" style="margin:0">還沒有議題，在下面新增。</p>';
+  h+='<div class="addline"><label for="n-topic" class="sr">新議題名稱</label><input id="n-topic" class="in" placeholder="輸入新議題，按 Enter 加入" data-draft-new value="'+esc(d.newTitle)+'"><button class="btn btn-link" data-act="draft-add">＋ 新增議題</button></div></section>';
+  if(prevTodos.length) h+='<section class="panel carry-panel"><h2>之前還有 '+prevTodos.length+' 項待辦沒完成</h2><p class="small" style="margin:0">建立後會顯示在會議記錄最上面，方便開會時追蹤。</p></section>';
+  h+='<div class="toolbar" style="justify-content:flex-end"><button class="btn btn-primary" data-act="create">建立並開始記錄 →</button></div>';
+  return h;
+}
+
+/* meeting editor */
+function viewMeeting(){
+  const m=cur;
+  const topics=m.topics||[];const decs=m.decisions||[];
+  const discussed=topics.filter(t=>t.status==='已討論').length;
+  const allOpen=topics.length&&topics.every(t=>open[t.id]);
+  let h='<div class="panel-head"><a class="btn btn-ghost" href="#list">← 會議列表</a><div class="toolbar"><span class="save-state" id="saveState" role="status">'+esc(saveState)+'</span><button class="btn" data-act="dl-one"'+dlAttr()+'>⬇ 下載這場（Excel）</button></div></div>';
+  h+='<section class="panel"><div class="grid3">'+
+    '<div class="field span2"><label for="m-title">會議名稱</label><input id="m-title" class="in" data-bind="title" value="'+esc(m.title)+'" style="font-size:18px;font-weight:600"></div>'+
+    '<div class="field"><label for="m-date">日期</label><input id="m-date" class="in" type="date" data-bind="date" value="'+esc(m.date)+'"></div>'+
+    '<div class="field"><label for="m-time">時間</label><input id="m-time" class="in" data-bind="time" value="'+esc(m.time)+'"></div>'+
+    '<div class="field"><label for="m-place">地點</label><input id="m-place" class="in" data-bind="place" value="'+esc(m.place)+'"></div>'+
+    '<div class="field"><label for="m-rec">記錄人</label><input id="m-rec" class="in" data-bind="recorder" value="'+esc(m.recorder)+'"></div>'+
+    '<div class="field" style="grid-column:1/-1"><label for="m-att">參加者</label><input id="m-att" class="in" data-bind="attendees" value="'+esc(m.attendees)+'"></div>'+
+    '</div></section>';
+  h+='<div id="carry">'+carryHtml()+'</div>';
+  // topics
+  h+='<section class="panel"><div class="panel-head"><div class="t"><h2>1. 議題與討論</h2><span class="small muted num">共 '+topics.length+' 個 · 已討論 '+discussed+' 個</span></div>'+(topics.length?'<button class="btn" data-act="toggle-all">'+(allOpen?'全部收合':'全部展開')+'</button>':'')+'</div>';
+  if(topics.length>3) h+='<nav class="toc" aria-label="議題目錄">'+topics.map((t,i)=>'<a href="#m-'+esc(m.id)+'" data-act="jump" data-tid="'+esc(t.id)+'">'+(i+1)+'. '+esc(t.title||'未命名')+'</a>').join('')+'</nav>';
+  topics.forEach((t,i)=>{
+    const isOpen=!!open[t.id];const notes=t.notes||[];
+    const st=t.status||'未討論';
+    const stPill=st==='延到下次'?'<span class="pill">延到下次</span>':st==='已討論'?'<span class="pill good">已討論</span>':'';
+    h+='<div class="topic" id="tp-'+esc(t.id)+'"><button class="topic-h" data-act="toggle" data-tid="'+esc(t.id)+'" aria-expanded="'+isOpen+'"><span class="no">議題 '+(i+1)+'</span><span class="tt">'+esc(t.title||'未命名議題')+'</span>'+stPill+'<span class="small muted num">'+notes.length+' 條討論</span><span class="arr" aria-hidden="true">'+(isOpen?'▾':'▸')+'</span></button>';
+    if(isOpen){
+      h+='<div class="topic-b"><div class="topic-row">'+
+        '<div class="field"><label for="tt-'+t.id+'">議題名稱</label><input id="tt-'+t.id+'" class="in" data-bind="topics.'+i+'.title" data-rerender-head value="'+esc(t.title)+'"></div>'+
+        '<div class="field"><label for="ts-'+t.id+'">狀態</label><select id="ts-'+t.id+'" class="in" data-bind="topics.'+i+'.status" data-rerender>'+opts(TOPIC_STATUS,st)+'</select></div></div>';
+      h+=notes.length?'<ul class="notes">'+notes.map((n,j)=>'<li><span>'+esc(n)+'</span><button class="icon-btn" aria-label="刪除這條討論" data-act="del-note" data-i="'+i+'" data-j="'+j+'">✕</button></li>').join('')+'</ul>':'';
+      h+='<div class="addline"><label class="sr" for="nn-'+t.id+'">新增討論重點</label><input id="nn-'+t.id+'" class="in" placeholder="輸入討論重點，按 Enter 加入" data-note-input data-i="'+i+'"><button class="btn btn-link" data-act="add-note" data-i="'+i+'">加入</button></div>';
+      h+='<div style="display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-danger" data-act="del-topic" data-i="'+i+'">刪除這個議題</button></div></div>';
+    }
+    h+='</div>';
+  });
+  h+='<div class="addline"><label class="sr" for="new-topic">新議題名稱</label><input id="new-topic" class="in" placeholder="新增議題，例如：年終尾牙規劃" data-topic-input><button class="btn btn-link" data-act="add-topic">＋ 新增議題</button></div></section>';
+  // decisions
+  h+='<section class="panel"><div class="panel-head"><div class="t"><h2>2. 決議與待辦</h2><span class="small muted">填了負責人，就會變成待辦，出現在「待辦總覽」</span></div><button class="btn btn-link" data-act="add-dec">＋ 新增決議</button></div>';
+  if(decs.length){
+    h+='<div><div class="dec-head"><span>決議內容</span><span>時間安排</span><span>負責人</span><span>狀態</span><span></span></div>';
+    decs.forEach((d,i)=>{
+      h+='<div class="dec"><div class="d-text"><label class="sr" for="dt-'+d.id+'">決議內容</label><input id="dt-'+d.id+'" class="in" data-bind="decisions.'+i+'.text" value="'+esc(d.text)+'" placeholder="決議或待辦內容"></div>'+
+        '<div><label class="sr" for="dd-'+d.id+'">時間安排</label><input id="dd-'+d.id+'" class="in" type="date" data-bind="decisions.'+i+'.due" value="'+esc(d.due)+'"></div>'+
+        '<div><label class="sr" for="do-'+d.id+'">負責人</label><input id="do-'+d.id+'" class="in" data-bind="decisions.'+i+'.owner" value="'+esc(d.owner)+'" placeholder="負責人"></div>'+
+        '<div><label class="sr" for="ds-'+d.id+'">狀態</label><select id="ds-'+d.id+'" class="in" data-bind="decisions.'+i+'.status">'+opts(TODO_STATUS,d.status||'未開始')+'</select></div>'+
+        '<button class="icon-btn d-del" aria-label="刪除這條決議" data-act="del-dec" data-i="'+i+'">✕</button></div>';
+    });
+    h+='</div>';
+  } else h+='<p class="muted small" style="margin:0">還沒有決議。按「＋ 新增決議」加一條。</p>';
+  h+='</section>';
+  h+='<div class="toolbar" style="justify-content:flex-end"><button class="btn btn-danger'+(armedDelete?' armed':'')+'" data-act="'+(armedDelete?'confirm-del':'arm-del')+'">'+(armedDelete?'確定刪除這場會議？再按一次':'刪除這場會議')+'</button>'+(armedDelete?'<button class="btn" data-act="disarm">取消</button>':'')+'</div>';
+  return h;
+}
+function carryHtml(){
+  if(!cur) return '';
+  const list=allTodos().filter(x=>x.m.id!==cur.id && x.d.status!=='已完成' && ((x.m.date||'')<(cur.date||'') || ((x.m.date||'')===(cur.date||'') && (x.m.createdAt||0)<(cur.createdAt||0))));
+  if(!list.length) return '';
+  list.sort((a,b)=>(a.d.due||'9999').localeCompare(b.d.due||'9999'));
+  return '<section class="panel carry-panel"><h2>之前會議還沒完成的待辦（'+list.length+'）</h2><div class="carry">'+list.map(x=>{const di=dueInfo(x.d);const sid='cs-'+x.m.id+'-'+x.d.id;return '<div class="carry-row"><span class="tx">'+esc(x.d.text)+' <span class="small muted">· '+esc(x.d.owner)+' · 來自 '+fmtDate(x.m.date)+'</span></span><span class="pill '+di.cls+'">'+esc(di.txt)+'</span><label class="sr" for="'+sid+'">狀態</label><select id="'+sid+'" class="in" data-todo-status data-mid="'+esc(x.m.id)+'" data-did="'+esc(x.d.id)+'">'+opts(TODO_STATUS,x.d.status||'未開始')+'</select></div>';}).join('')+'</div></section>';
+}
+function refreshCarry(){const el=document.getElementById('carry');if(el&&!el.contains(document.activeElement))el.innerHTML=carryHtml();}
+function paintSave(err){const el=document.getElementById('saveState');if(el){el.textContent=saveState;el.classList.toggle('err',!!err);}}
+function dlAttr(){return dl?'':' disabled title="這個檢視無法下載檔案"';}
+function refreshDownloadButtons(){document.querySelectorAll('[data-act="dl-one"],[data-act="dl-all"]').forEach(b=>{b.disabled=!dl;if(dl)b.removeAttribute('title');});}
+function rerenderMeeting(focusId){
+  const y=window.scrollY;app.innerHTML=(dbState==='off'?'<div class="notice">目前連不上 Google 試算表，請檢查網路後重新整理頁面。</div>':'')+viewMeeting();refreshDownloadButtons();window.scrollTo(0,y);
+  if(focusId){const el=document.getElementById(focusId);if(el)el.focus();}
+}
+
+/* ---------- events ---------- */
+app.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.hasAttribute('data-search')){search=t.value;document.getElementById('mlist').innerHTML=listBody();return;}
+  if(t.hasAttribute('data-draft')&&draft){draft[t.getAttribute('data-draft')]=t.value;return;}
+  if(t.hasAttribute('data-draft-new')&&draft){draft.newTitle=t.value;return;}
+  if(t.hasAttribute('data-bind')&&cur&&t.tagName!=='SELECT'){
+    setPath(cur,t.getAttribute('data-bind'),t.value);
+    if(t.hasAttribute('data-rerender-head')){const tp=t.closest('.topic');if(tp){const tt=tp.querySelector('.tt');if(tt)tt.textContent=t.value||'未命名議題';}}
+    scheduleSave();
+  }
+});
+app.addEventListener('change',async e=>{
+  const t=e.target;
+  if(t.hasAttribute('data-bind')&&cur){
+    const v=t.hasAttribute('data-num')?Number(t.value):t.value;
+    setPath(cur,t.getAttribute('data-bind'),v);
+    scheduleSave();
+    if(t.hasAttribute('data-rerender')) rerenderMeeting(t.id);
+    if(t.getAttribute('data-bind')==='date'){const el=document.getElementById('carry');if(el)el.innerHTML=carryHtml();}
+    return;
+  }
+  if(t.hasAttribute('data-draft')&&draft){draft[t.getAttribute('data-draft')]=t.value;return;}
+  if(t.hasAttribute('data-todo-status')){
+    const mid=t.getAttribute('data-mid'),did=t.getAttribute('data-did');
+    const src=(cur&&cur.id===mid)?cur:meetings.find(x=>x.id===mid);
+    if(!src) return;
+    const copy=(cur&&cur.id===mid)?cur:clone(src);
+    const d=(copy.decisions||[]).find(x=>x.id===did);if(!d) return;
+    d.status=t.value;
+    if(copy===cur){scheduleSave();return;}
+    writeMeeting(copy).catch(()=>alertBox('狀態暫時沒存到，連上網路後會自動再存。'));
+    if(route().view==='todos') render(); else {const el=document.getElementById('carry');if(el)el.innerHTML=carryHtml();}
+  }
+});
+app.addEventListener('keydown',e=>{
+  if(e.key!=='Enter'||e.isComposing) return;
+  const t=e.target;
+  if(t.hasAttribute('data-note-input')){e.preventDefault();addNote(Number(t.getAttribute('data-i')));}
+  else if(t.hasAttribute('data-topic-input')){e.preventDefault();addTopic();}
+  else if(t.hasAttribute('data-draft-new')){e.preventDefault();draftAdd();}
+});
+app.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const act=b.getAttribute('data-act');const i=Number(b.getAttribute('data-i'));
+  switch(act){
+    case 'todo-tab': todoTab=b.getAttribute('data-v'); render(); break;
+    case 'pick-tpl': {
+      const k=b.getAttribute('data-v');const tp=TEMPLATES[k];
+      const carried=draft.topics.filter(t=>t.carried);
+      const oldName=TEMPLATES[draft.tpl].name;
+      draft.tpl=k;
+      if(!draft.title||draft.title===oldName) draft.title=k==='blank'?'':tp.name;
+      draft.topics=tp.topics.map(([n,mi])=>({id:rid(),title:n,min:mi})).concat(carried);
+      render(); break;}
+    case 'draft-add': draftAdd(); break;
+    case 'draft-del': draft.topics.splice(i,1); render(); break;
+    case 'create': createMeeting(b); break;
+    case 'toggle': {const id=b.getAttribute('data-tid');open[id]=!open[id];rerenderMeeting();break;}
+    case 'toggle-all': {const all=cur.topics.every(t=>open[t.id]);open={};if(!all)cur.topics.forEach(t=>open[t.id]=true);rerenderMeeting();break;}
+    case 'jump': {e.preventDefault();const id=b.getAttribute('data-tid');open[id]=true;rerenderMeeting();const el=document.getElementById('tp-'+id);if(el)el.scrollIntoView({block:'start'});break;}
+    case 'add-note': addNote(i); break;
+    case 'del-note': cur.topics[i].notes.splice(Number(b.getAttribute('data-j')),1); scheduleSave(); rerenderMeeting(); break;
+    case 'add-topic': addTopic(); break;
+    case 'del-topic': {const t=cur.topics[i];delete open[t.id];cur.topics.splice(i,1);scheduleSave();rerenderMeeting();break;}
+    case 'add-dec': {cur.decisions=cur.decisions||[];const d={id:rid(),text:'',due:'',owner:'',status:'未開始'};cur.decisions.push(d);scheduleSave();rerenderMeeting('dt-'+d.id);break;}
+    case 'del-dec': cur.decisions.splice(i,1); scheduleSave(); rerenderMeeting(); break;
+    case 'arm-del': armedDelete=true; rerenderMeeting(); break;
+    case 'disarm': armedDelete=false; rerenderMeeting(); break;
+    case 'confirm-del': deleteMeeting(); break;
+    case 'dl-one': if(cur) download([cur], (cur.date||'')+' '+(cur.title||'會議記錄')); break;
+    case 'dl-all': download(sortedMeetings(),'會議記錄存檔 '+todayStr()); break;
+  }
+});
+function draftAdd(){
+  const inp=document.getElementById('n-topic');const name=(inp?inp.value:draft.newTitle).trim();
+  if(!name){if(inp)inp.focus();return;}
+  draft.topics.push({id:rid(),title:name});draft.newTitle='';
+  render();const n=document.getElementById('n-topic');if(n)n.focus();
+}
+function addNote(i){
+  const t=cur.topics[i];const inp=document.getElementById('nn-'+t.id);const v=inp?inp.value.trim():'';
+  if(!v){if(inp)inp.focus();return;}
+  t.notes=t.notes||[];t.notes.push(v);
+  if(!t.status||t.status==='未討論') t.status='已討論';
+  scheduleSave();rerenderMeeting('nn-'+t.id);
+}
+function addTopic(){
+  const inp=document.getElementById('new-topic');const v=inp.value.trim();
+  if(!v){inp.focus();return;}
+  const t={id:rid(),title:v,status:'未討論',notes:[]};
+  cur.topics=cur.topics||[];cur.topics.push(t);open[t.id]=true;
+  scheduleSave();rerenderMeeting('nn-'+t.id);
+}
+async function createMeeting(btn){
+  const d=draft;
+  if(!d.title.trim()){const el=document.getElementById('n-title');el.focus();el.placeholder='請填會議名稱';return;}
+  btn.disabled=true;btn.textContent='建立中…';
+  const now=Date.now();
+  const m={id:rid(),title:d.title.trim(),date:d.date,time:d.time,place:d.place,attendees:d.attendees,recorder:d.recorder,template:TEMPLATES[d.tpl].name,
+    topics:d.topics.map(t=>({id:t.id,title:t.title,status:'未討論',notes:[]})),decisions:[],createdAt:now};
+  writeMeeting(m).catch(()=>alertBox('會議已建立，但暫時沒存到 Google 試算表，連上網路後會自動再存。'));
+  cur=clone(meetings.find(x=>x.id===m.id)||m);open={};if(cur.topics[0])open[cur.topics[0].id]=true;
+  draft=null;location.hash='#m-'+m.id;
+}
+async function deleteMeeting(){
+  const id=cur.id;clearTimeout(saveTimer);saveTimer=null;
+  pendingDel[id]=true;delete pending[id];delete failed[id];
+  meetings=meetings.filter(x=>x.id!==id);saveCache();cur=null;location.hash='#list';
+  try{await apiPost({action:'delete',id:id});delete pendingDel[id];}
+  catch(e){delete pendingDel[id];alertBox('刪除沒有成功，請重新整理後再試一次。');refresh();}
+}
+function alertBox(msg){
+  const n=document.createElement('div');n.className='notice';n.setAttribute('role','alert');n.textContent=msg;app.prepend(n);setTimeout(()=>n.remove(),6000);
+}
+
+/* ---------- export ---------- */
+async function download(list,name){
+  if(!dl){alertBox('這個檢視無法下載檔案。');return;}
+  if(!window.XLSX){alertBox('Excel 工具還沒載入完成，請稍後再按一次。');return;}
+  const s1=[['會議編號','日期','時間','會議名稱','地點','參加者','記錄人','範本','議題數','未完成待辦']];
+  const s2=[['會議編號','會議名稱','議題序號','議題','狀態','討論重點']];
+  const s3=[['會議編號','會議名稱','決議內容','時間安排','類型','負責人','狀態']];
+  list.forEach(m=>{
+    const no=meetingNo(m);const td=(m.decisions||[]).filter(isTodo);
+    s1.push([no,m.date||'',m.time||'',m.title||'',m.place||'',m.attendees||'',m.recorder||'',m.template||'',(m.topics||[]).length,td.filter(d=>d.status!=='已完成').length]);
+    (m.topics||[]).forEach((t,i)=>s2.push([no,m.title||'',i+1,t.title||'',t.status||'未討論',(t.notes||[]).join('\n')]));
+    (m.decisions||[]).forEach(d=>s3.push([no,m.title||'',d.text||'',d.due||'',isTodo(d)?'待辦':'決議',d.owner||'',isTodo(d)?(d.status||'未開始'):'']));
+  });
+  const wb=XLSX.utils.book_new();
+  const add=(rows,title,widths)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,title);};
+  add(s1,'會議總表',[16,12,13,22,12,34,10,14,8,10]);
+  add(s2,'議題與討論',[16,20,8,20,10,60]);
+  add(s3,'決議與待辦',[16,20,34,12,8,10,10]);
+  const fname=name.replace(/[\\/:*?"<>|]/g,' ').trim()+'.xlsx';
+  try{XLSX.writeFile(wb,fname);}catch(err){alertBox('下載沒有成功，請再試一次。');}
+}
+
+render();
+startDb();
+})();
+</script>
+</body>
+</html>
