@@ -214,7 +214,7 @@ function getPath(obj,path){return path.split('.').reduce((o,k)=>o==null?o:o[k],o
 function setPath(obj,path,val){const ks=path.split('.');const last=ks.pop();const t=ks.reduce((o,k)=>o[k],obj);t[last]=val;}
 
 /* ---------- data ---------- */
-const API_URL = '__API_URL__';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwCiL0tXRaRgYAVVzFVdCpVeYRoBtszBZyD1xnMiP226qJsxqOsIXM8kfdELZ06R_DKkQ/exec';
 const CACHE_KEY = 'meeting-cache-v1';
 let pending = {}, failed = {}, pendingDel = {}, refreshing = false;
 function apiReady(){return /^https:\/\/script\.google\.com\//.test(API_URL);}
