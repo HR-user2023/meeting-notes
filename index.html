@@ -128,6 +128,10 @@ select.in{padding:0 8px}
 .notice{border-radius:12px;padding:12px 16px;background:var(--soft);font-size:14px}
 .ok{border-radius:12px;padding:14px 18px;background:var(--ink);color:var(--on-ink);font-weight:600}
 .save-state{font-size:13px;color:var(--muted)}
+.save-state.ok{color:var(--fg);font-weight:600}
+.sync{font-size:13px;color:var(--muted);white-space:nowrap}
+.sync.bad{color:var(--fg);font-weight:700}
+.warn-box{border:2px solid var(--ink);border-radius:12px;padding:14px 18px;background:var(--surface);display:flex;flex-direction:column;gap:4px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tablewrap{overflow-x:auto}
 table.t{width:100%;border-collapse:collapse;font-size:14px}
@@ -191,6 +195,8 @@ table.t td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:t
 <header class="top"><div class="top-in">
   <nav class="crumbs" id="crumbs" aria-label="目前位置"></nav>
   <div class="row">
+    <span class="sync" id="sync" role="status"></span>
+    <a class="btn btn-line" href="#new" id="topNew">＋ 新增會議記錄</a>
     <a class="btn btn-ink" href="#report" id="topReport">✎ 我要回報進度</a>
   </div>
 </div></header>
@@ -216,7 +222,7 @@ const modal = document.getElementById('modal');
 let S = {group:{},meeting:{},report:{}};
 let pending = {}, failed = {}, pendingDel = {};
 let state = 'loading', refreshing = false;
-let cur = null, saveTimer = null, saveState = '';
+let cur = null, saveTimer = null, saveState = '', lastOk = 0, oldScript = false, lastErr = '';
 const ui = {open:{}, progTab:'open', progOwner:'', armed:'', draft:null, newGroup:false, reportWho:lsGet('report-who'), reportDraft:{}, reportOk:'', dlg:null, settings:null};
 
 /* ---------- helpers ---------- */
@@ -320,11 +326,11 @@ function stamp(o){o=clone(o);o.updatedAt=Date.now();o.updatedBy=clientId;return 
 function put(kind,obj){
   const o=stamp(obj);S[kind][o.id]=o;const k=kind+':'+o.id;pending[k]={kind,obj:o};saveCache();
   if(cur&&kind==='meeting'&&cur.id===o.id){cur.updatedAt=o.updatedAt;cur.updatedBy=clientId;}
-  return apiPost({action:'save',kind,item:o}).then(()=>{if(pending[k]&&pending[k].obj===o)delete pending[k];delete failed[k];}).catch(e=>{failed[k]=true;throw e;});
+  paintSync();return apiPost({action:'save',kind,item:o}).then(()=>{if(pending[k]&&pending[k].obj===o)delete pending[k];delete failed[k];lastOk=Date.now();lastErr='';paintSync();}).catch(e=>{failed[k]=true;lastErr=String(e&&e.message||e);paintSync();throw e;});
 }
 function putMany(kind,objs){
   const os=objs.map(stamp);os.forEach(o=>{S[kind][o.id]=o;pending[kind+':'+o.id]={kind,obj:o};});saveCache();
-  return apiPost({action:'saveMany',kind,items:os}).then(()=>os.forEach(o=>{const k=kind+':'+o.id;if(pending[k]&&pending[k].obj===o)delete pending[k];delete failed[k];})).catch(e=>{os.forEach(o=>failed[kind+':'+o.id]=true);throw e;});
+  paintSync();return apiPost({action:'saveMany',kind,items:os}).then(()=>{os.forEach(o=>{const k=kind+':'+o.id;if(pending[k]&&pending[k].obj===o)delete pending[k];delete failed[k];});lastOk=Date.now();lastErr='';paintSync();}).catch(e=>{os.forEach(o=>failed[kind+':'+o.id]=true);lastErr=String(e&&e.message||e);paintSync();throw e;});
 }
 function removeObj(kind,id){
   const k=kind+':'+id;pendingDel[k]=true;delete pending[k];delete failed[k];delete S[kind][id];
@@ -341,11 +347,11 @@ function merge(data){
 }
 function flushFailed(){
   Object.keys(failed).forEach(k=>{const p=pending[k];delete failed[k];if(!p)return;
-    apiPost({action:'save',kind:p.kind,item:p.obj}).then(()=>{if(pending[k]===p)delete pending[k];}).catch(()=>{failed[k]=true;});});
+    apiPost({action:'save',kind:p.kind,item:p.obj}).then(()=>{if(pending[k]===p)delete pending[k];lastOk=Date.now();paintSync();}).catch(()=>{failed[k]=true;paintSync();});});
 }
 async function refresh(){
   if(!apiReady()||refreshing)return;refreshing=true;
-  try{const data=await apiList();merge(data);state='on';saveCache();onData();flushFailed();}
+  try{const data=await apiList();const wasOld=oldScript;oldScript=!('groups' in data);if(wasOld!==oldScript)setTimeout(render,0);merge(data);state='on';saveCache();onData();flushFailed();}
   catch(e){if(state!=='on'){state='off';render();}}
   finally{refreshing=false;}
 }
@@ -373,10 +379,13 @@ function onData(){
 function scheduleSave(){if(!cur)return;saveState='儲存中…';paintSave();clearTimeout(saveTimer);saveTimer=setTimeout(doSave,800);}
 async function doSave(){
   saveTimer=null;if(!cur)return;
-  try{await put('meeting',cur);saveState='已存到 Google 試算表';paintSave();}
-  catch(e){saveState=String(e&&e.message||'').indexOf('太長')>=0?e.message:'暫時沒存到，連上網路後會自動再存';paintSave();}
+  try{await put('meeting',cur);saveState='✓ 已存到 Google 試算表（'+hm()+'）';paintSave(true);}
+  catch(e){const m=String(e&&e.message||'');saveState=m.indexOf('太長')>=0?m:oldScript||m.indexOf('missing id')>=0?'⚠ 沒存到：試算表的程式還是舊版，請先更新':'⚠ 暫時沒存到，請檢查網路，連上後會自動再存';paintSave(false);}
 }
-function paintSave(){const el=document.getElementById('saveState');if(el)el.textContent=saveState;}
+function hm(t){const d=t?new Date(t):new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function paintSave(ok){const el=document.getElementById('saveState');if(el){el.textContent=saveState;el.classList.toggle('ok',ok===true);}}
+function paintSync(){const el=document.getElementById('sync');if(!el)return;const f=Object.keys(failed).length,p=Object.keys(pending).length;el.classList.toggle('bad',!!f||oldScript);
+  el.textContent=oldScript?'⚠ 試算表程式需要更新':f?'⚠ 有 '+f+' 筆還沒存到':p?'儲存中…':lastOk?'✓ 已存到試算表 '+hm(lastOk):'';}
 
 /* ---------- routing ---------- */
 function route(){
@@ -385,7 +394,7 @@ function route(){
   if(h==='report')return {view:'report'};
   const p=h.split('-');
   if(p[0]==='g'&&p[1])return {view:p[2]==='progress'?'progress':p[2]==='settings'?'settings':'group',gid:p[1]};
-  if(p[0]==='new'&&p[1])return {view:'new',gid:p[1]};
+  if(p[0]==='new')return {view:'new',gid:p[1]||lsGet('last-gid')||'ops'};
   if(p[0]==='m'&&p[1])return {view:'meeting',id:p[1]};
   return {view:'home'};
 }
@@ -408,9 +417,12 @@ function render(){
   const r=route();
   app.className='';
   document.getElementById('topReport').hidden=(r.view==='home'||r.view==='report');
+  document.getElementById('topNew').hidden=(r.view==='new'||r.view==='home');
+  paintSync();
   if(state==='loading'){crumbs([]);app.innerHTML='<div class="empty"><b>正在載入會議記錄…</b><span class="muted small">稍等一下，資料讀取中。</span></div>';return;}
   if(state==='setup'){crumbs([]);app.innerHTML='<div class="empty"><b>還沒連上 Google 試算表</b></div>';return;}
-  const off=state==='off'?'<div class="notice">目前連不上 Google 試算表，請檢查網路後重新整理頁面。</div>':'';
+  let off=state==='off'?'<div class="notice">目前連不上 Google 試算表，請檢查網路後重新整理頁面。</div>':'';
+  if(oldScript)off+='<div class="warn-box" role="alert"><b>⚠ Google 試算表的存檔程式還是舊版，新的記錄存不進去</b><span class="small">請到試算表的「擴充功能 → Apps Script」換成新版 Code.gs，再到「部署 → 管理部署作業」選「新版本」部署。</span></div>';
   let h='';
   if(r.view==='report')h=viewReport();
   else if(r.view==='group'||r.view==='progress'||r.view==='settings'){
@@ -418,7 +430,7 @@ function render(){
     if(!g){crumbs([]);h=notFound('找不到這個組別');}
     else h=r.view==='group'?viewGroup(g):r.view==='progress'?viewProgress(g):viewSettings(g);
   }
-  else if(r.view==='new'){const g=groupById(r.gid);h=g?viewNew(g):notFound('找不到這個組別');}
+  else if(r.view==='new'){const g=groupById(r.gid)||groupById('ops');h=g?viewNew(g):notFound('找不到這個組別');}
   else if(r.view==='meeting'){
     const m=S.meeting[r.id]||(cur&&cur.id===r.id?cur:null);
     if(!m){crumbs([]);h=notFound('找不到這場會議，可能已經被刪除');}
@@ -440,7 +452,7 @@ function viewHome(){
   const open=buildItems().filter(i=>!i.closed);
   const notYet=open.filter(i=>!after(i.last,lastHeld(i.gid))).length;
   let h='<a class="banner" href="#report"><span style="display:flex;flex-direction:column;gap:2px"><b>有負責追蹤項目嗎？開會前先回報進度</b><span class="sub">選自己的名字，所有組別的項目一次填完。'+(open.length?'目前還有 '+notYet+' 項還沒回報。':'')+'</span></span><span class="go">✎ 我要回報進度</span></a>';
-  h+='<div style="display:flex;flex-direction:column;gap:2px"><h1>選擇組別</h1><p class="muted" style="margin:0">每個組別有自己的會議記錄和進度回報。</p></div>';
+  h+='<div class="row between" style="align-items:flex-end"><div style="display:flex;flex-direction:column;gap:2px"><h1>選擇組別</h1><p class="muted" style="margin:0">每個組別有自己的會議記錄和進度回報。</p></div><a class="btn btn-ink" href="#new" style="min-height:48px;font-size:16px;padding:0 22px">＋ 新增會議記錄</a></div>';
   const gs=groups().slice();if(hasUngrouped())gs.push(groupById('none'));
   h+='<div class="gcards">'+gs.map(g=>{
     const s=groupStats(g.id);
@@ -568,7 +580,7 @@ function viewMeeting(){
   const topics=m.topics||[],decs=m.decisions||[];
   const allOpen=topics.length&&topics.every(t=>ui.open[t.id]);
   const mem=memberNames(gidOf(m)).concat(names(m.attendees)).concat(list('meeting').flatMap(x=>(x.decisions||[]).flatMap(d=>names(d.owner))));
-  let h='<div class="row between"><span class="save-state" id="saveState" role="status">'+esc(saveState)+'</span><div class="row"><button class="btn" data-act="dl-mimg">⬇ 下載圖片</button><button class="btn" data-act="dl-mxls">⬇ Excel</button></div></div>';
+  let h='<div class="row between"><span class="save-state" id="saveState" role="status">'+esc(saveState)+'</span><div class="row"><button class="btn btn-ink" data-act="save-now">儲存</button><button class="btn" data-act="dl-mimg">⬇ 下載圖片</button><button class="btn" data-act="dl-mxls">⬇ Excel</button></div></div>';
   h+='<datalist id="people">'+[...new Set(mem)].map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>';
   h+='<section class="panel"><div class="row"><span class="tag">組別：'+esc(g.name)+'</span>'+(m.type?'<span class="tag">'+esc(m.type)+'</span>':'')+'</div><div class="grid3">'+
     '<div class="field full"><label for="m-title">會議名稱</label><input id="m-title" class="in" data-bind="title" value="'+esc(m.title)+'" style="font-size:18px;font-weight:600"></div>'+
@@ -720,6 +732,7 @@ function doAct(act,b,e){
     case 'draft-add': {const d=ui.draft;const el=document.getElementById('n-topic');const v=(el?el.value:d.newTopic).trim();if(!v){if(el)el.focus();break;}d.topics.push({id:rid(),title:v});d.newTopic='';render();const n=document.getElementById('n-topic');if(n)n.focus();break;}
     case 'draft-del': ui.draft.topics.splice(i,1);render();break;
     case 'create': createMeeting(b);break;
+    case 'save-now': clearTimeout(saveTimer);saveTimer=null;saveState='儲存中…';paintSave();doSave();break;
     case 'pick-group': {const g=groupById(b.dataset.v);if(!g)break;const d=ui.draft;d.gid=g.id;d.addingGroup=false;if(d.titleAuto)d.title=nthTitle(g);if(g.members)d.attendees=g.members;location.hash='#new-'+g.id;break;}
     case 'add-group-inline': ui.draft.addingGroup=!ui.draft.addingGroup;render();setTimeout(()=>{const n=document.getElementById('n-gname');if(n)n.focus();},0);break;
     case 'create-group-inline': {const d=ui.draft;const el=document.getElementById('n-gname');const name=(el?el.value:d.newGroupName||'').trim();if(!name){if(el)el.focus();break;}
@@ -746,7 +759,7 @@ function doAct(act,b,e){
 function createMeeting(btn){
   const d=ui.draft;let g=groupById(d.gid);if(!g)return;
   if(!d.title.trim()){const el=document.getElementById('n-title');el.focus();return;}
-  g=ensureGroup(g)||g;const type=g.name;
+  g=ensureGroup(g)||g;const type=g.name;lsSet('last-gid',g.id);
   const m={id:rid(),groupId:g.id,type,title:d.title.trim(),date:d.date,time:d.time,place:d.place,attendees:d.attendees,recorder:d.recorder,topics:d.topics.map(t=>({id:t.id,title:t.title,notes:[]})),decisions:[],createdAt:Date.now()};
   put('meeting',m).catch(()=>alertBox('會議已建立，但暫時沒存到 Google 試算表，連上網路後會自動再存。'));
   cur=clone(S.meeting[m.id]);ui.open={};if(cur.topics[0])ui.open[cur.topics[0].id]=true;
