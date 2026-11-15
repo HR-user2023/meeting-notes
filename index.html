@@ -205,12 +205,7 @@ table.t td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:t
 'use strict';
 const API_URL = 'https://script.google.com/macros/s/AKfycbwCiL0tXRaRgYAVVzFVdCpVeYRoBtszBZyD1xnMiP226qJsxqOsIXM8kfdELZ06R_DKkQ/exec';
 const CACHE_KEY = 'meeting-v2-cache';
-const TYPES = {
-  project:{name:'專案會議',topics:['專案進度','問題與風險','下一步與時程']},
-  ops:{name:'營運會議',topics:['營運數據檢討','本期工作重點','問題與支援']},
-  store:{name:'門市會議',topics:['門市業績','人力與排班','門市狀況與客訴']},
-  custom:{name:'自行填寫',topics:[]}
-};
+const PRESETS = [{id:'ops',name:'營運會議',createdAt:1},{id:'store',name:'門市會議',createdAt:2}];
 const STATUS = ['進行中','已完成','卡關，需要協助'];
 const STUCK = '卡關，需要協助';
 const WD = ['日','一','二','三','四','五','六'];
@@ -244,10 +239,12 @@ function opts(arr,sel){return arr.map(v=>{const val=typeof v==='object'?v.v:v;co
 const PCTS=[0,10,20,30,40,50,60,70,80,90,100].map(n=>({v:n,l:n+'%'}));
 
 /* ---------- groups & meetings ---------- */
-function groups(){return list('group').sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));}
-function gidOf(m){return S.group[m.groupId]?m.groupId:'none';}
+function presetOf(id){return PRESETS.find(p=>p.id===id)||null;}
+function groups(){const out=list('group');PRESETS.forEach(p=>{if(!S.group[p.id])out.push(Object.assign({schedule:'',members:'',virtualPreset:true},p));});return out.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));}
+function gidOf(m){return S.group[m.groupId]||presetOf(m.groupId)?m.groupId:'none';}
+function ensureGroup(g){if(g&&g.virtualPreset){const o={id:g.id,name:g.name,schedule:'',members:'',createdAt:g.createdAt};put('group',o).catch(()=>{});return S.group[g.id];}return g;}
 function hasUngrouped(){return list('meeting').some(m=>gidOf(m)==='none');}
-function groupById(id){if(S.group[id])return S.group[id];if(id==='none')return {id:'none',name:'未分組',schedule:'',members:'',virtual:true};return null;}
+function groupById(id){if(S.group[id])return S.group[id];const p=presetOf(id);if(p)return Object.assign({schedule:'',members:'',virtualPreset:true},p);if(id==='none')return {id:'none',name:'未分組',schedule:'',members:'',virtual:true};return null;}
 function meetingsOf(gid){return list('meeting').filter(m=>gidOf(m)===gid).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)-(a.createdAt||0));}
 function isBefore(a,b){return (a.date||'')<(b.date||'')||((a.date||'')===(b.date||'')&&(a.createdAt||0)<(b.createdAt||0));}
 function after(r,pm){if(!r)return false;if(!pm)return true;const d=r.date||'',pd=pm.date||'';return d>pd||(d===pd&&(r.at||0)>(pm.createdAt||0));}
@@ -450,7 +447,7 @@ function viewHome(){
     const badge=s.stuck?'<span class="pill ink">'+s.stuck+' 項卡關</span>':s.overdue?'<span class="pill ink">'+s.overdue+' 項逾期</span>':s.open?'<span class="pill soft">'+s.open+' 項追蹤中</span>':'<span class="pill">沒有追蹤項目</span>';
     const mem=names(g.members).length;
     return '<a class="gcard" href="#g-'+g.id+'"><div class="row between" style="align-items:flex-start"><div style="display:flex;flex-direction:column"><span class="nm">'+esc(g.name)+'</span><span class="small muted">'+esc([g.schedule,mem?mem+' 位成員':''].filter(Boolean).join(' · ')||'　')+'</span></div>'+badge+'</div><div class="gstats"><div><span>會議</span><b>'+s.meetings+' 場</b></div><div><span>追蹤中</span><b>'+s.open+' 項</b></div><div><span>最近開會</span><b>'+s.last+'</b></div></div></a>';
-  }).join('')+(ui.newGroup?newGroupForm():'<button class="gadd" data-act="new-group"><b style="font-size:17px">＋ 新增組別</b><span class="small muted">例如：店點例會、營運小組會</span></button>')+'</div>';
+  }).join('')+(ui.newGroup?newGroupForm():'<button class="gadd" data-act="new-group"><b style="font-size:17px">＋ 自行填寫組別</b><span class="small muted">例如：專案會議、行銷小組</span></button>')+'</div>';
   const recent=list('meeting').sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)-(a.createdAt||0)).slice(0,6);
   if(recent.length)h+='<section style="display:flex;flex-direction:column;gap:8px"><h2>最近的會議（全部組別）</h2><div class="list">'+recent.map(m=>'<a class="li" href="#m-'+m.id+'"><span class="tag">'+esc(groupById(gidOf(m)).name)+'</span><span class="tt">'+esc(m.title||'未命名會議')+'</span><span class="small muted">'+fmtDate(m.date)+'</span></a>').join('')+'</div></section>';
   else if(!gs.length)h+='<div class="empty"><b>先新增一個組別</b><span class="muted small">例如「店點例會」，之後的會議都會記在組別底下。</span></div>';
@@ -458,7 +455,7 @@ function viewHome(){
 }
 function newGroupForm(){
   return '<form class="panel" data-form="group" style="grid-column:1/-1"><h2>新增組別</h2><div class="grid2">'+
-    '<div class="field"><label for="ng-name">組別名稱</label><input id="ng-name" class="in" required placeholder="例如：店點例會"></div>'+
+    '<div class="field"><label for="ng-name">組別名稱</label><input id="ng-name" class="in" required placeholder="例如：專案會議"></div>'+
     '<div class="field"><label for="ng-sch">開會時間（可不填）</label><input id="ng-sch" class="in" placeholder="例如：每週一 09:00"></div>'+
     '<div class="field full"><label for="ng-mem">成員（可不填，用頓號分開）</label><input id="ng-mem" class="in" placeholder="王小明、陳美玲、林志豪"></div></div>'+
     '<div class="row" style="justify-content:flex-end"><button type="button" class="btn btn-ghost" data-act="cancel-group">取消</button><button class="btn btn-ink">建立組別</button></div></form>';
@@ -528,7 +525,7 @@ function viewSettings(g){
 function nthTitle(g){return '第 '+(meetingsOf(g.id).length+1)+' 次'+g.name;}
 function newDraft(g){
   const lh=meetingsOf(g.id)[0];
-  return {gid:g.id,type:'store',custom:'',title:nthTitle(g),titleAuto:true,date:todayStr(),time:lh?lh.time||'':'',place:lh?lh.place||'':'',attendees:g.members||'',recorder:'',topics:TYPES.store.topics.map(t=>({id:rid(),title:t})),newTopic:''};
+  return {gid:g.id,title:nthTitle(g),titleAuto:true,date:todayStr(),time:lh?lh.time||'':'',place:lh?lh.place||'':'',attendees:g.members||'',recorder:'',topics:[],newTopic:''};
 }
 function viewNew(g){
   if(!ui.draft||ui.draft.gid!==g.id)ui.draft=newDraft(g);
@@ -536,19 +533,17 @@ function viewNew(g){
   crumbs([{t:g.name,href:'#g-'+g.id},{t:'新增會議'}]);
   app.className='narrow';
   let h='<div class="row between"><h1>新增會議</h1><a class="btn btn-ghost" href="#g-'+g.id+'">取消</a></div>';
-  h+='<section class="panel"><h2>1. 組別</h2><div class="cards4">'+groups().map(x=>'<button class="choice" data-act="pick-group" data-v="'+x.id+'" aria-pressed="'+(d.gid===x.id)+'"><b>'+esc(x.name)+'</b><span class="small muted">'+meetingsOf(x.id).length+' 場會議</span></button>').join('')+
-    '<button class="choice dash" data-act="add-group-inline" aria-pressed="'+(!!d.addingGroup)+'"><b>＋ 新增組別</b><span class="small muted">自己取名字</span></button></div>'+
-    (d.addingGroup?'<div class="addline"><label class="sr" for="n-gname">新組別名稱</label><input id="n-gname" class="in" data-draft="newGroupName" data-enter="create-group-inline" value="'+esc(d.newGroupName||'')+'" placeholder="例如：行銷小組"><button class="btn btn-ink" data-act="create-group-inline">建立組別</button></div>':'')+'</section>';
-  h+='<section class="panel"><h2>2. 會議類型</h2><div class="cards4">'+Object.keys(TYPES).map(k=>{const t=TYPES[k];return '<button class="choice'+(k==='custom'?' dash':'')+'" data-act="pick-type" data-v="'+k+'" aria-pressed="'+(d.type===k)+'"><b>'+t.name+'</b><span class="small muted">'+(t.topics.length?'帶入 '+t.topics.length+' 個議題':'自己取名、自己填議題')+'</span></button>';}).join('')+'</div>'+
-    (d.type==='custom'?'<div class="field"><label for="n-ctype">會議類型名稱</label><input id="n-ctype" class="in" data-draft="custom" value="'+esc(d.custom)+'" placeholder="例如：教育訓練會議"></div>':'')+'</section>';
-  h+='<section class="panel"><h2>3. 會議資訊</h2><div class="grid3">'+
+  h+='<section class="panel"><h2>1. 組別</h2><div class="cards4">'+groups().map(x=>'<button class="choice" data-act="pick-group" data-v="'+x.id+'" aria-pressed="'+(d.gid===x.id)+'"><b>'+esc(x.name)+'</b><span class="small muted">'+meetingsOf(x.id).length+' 場會議'+'</span></button>').join('')+
+    '<button class="choice dash" data-act="add-group-inline" aria-pressed="'+(!!d.addingGroup)+'"><b>＋ 自行填寫</b><span class="small muted">自己取組別名稱</span></button></div>'+
+    (d.addingGroup?'<div class="addline"><label class="sr" for="n-gname">新組別名稱</label><input id="n-gname" class="in" data-draft="newGroupName" data-enter="create-group-inline" value="'+esc(d.newGroupName||'')+'" placeholder="例如：專案會議、行銷小組"><button class="btn btn-ink" data-act="create-group-inline">建立組別</button></div>':'')+'</section>';
+  h+='<section class="panel"><h2>2. 會議資訊</h2><div class="grid3">'+
     '<div class="field full"><label for="n-title">會議名稱</label><input id="n-title" class="in" data-draft="title" value="'+esc(d.title)+'"></div>'+
     '<div class="field"><label for="n-date">日期</label><input id="n-date" type="date" class="in" data-draft="date" value="'+esc(d.date)+'"></div>'+
     '<div class="field"><label for="n-time">時間</label><input id="n-time" class="in" data-draft="time" value="'+esc(d.time)+'" placeholder="09:00–10:00"></div>'+
     '<div class="field"><label for="n-place">地點</label><input id="n-place" class="in" data-draft="place" value="'+esc(d.place)+'"></div>'+
     '<div class="field" style="grid-column:span 2"><label for="n-att">參加者</label><input id="n-att" class="in" data-draft="attendees" value="'+esc(d.attendees)+'"></div>'+
     '<div class="field"><label for="n-rec">記錄人</label><input id="n-rec" class="in" data-draft="recorder" value="'+esc(d.recorder)+'"></div></div></section>';
-  h+='<section class="panel"><div class="panel-head"><div class="t"><h2>4. 議題</h2><span class="small muted">'+(d.topics.length?'共 '+d.topics.length+' 個，可以增減':'還沒有議題，在下面新增')+'</span></div></div>';
+  h+='<section class="panel"><div class="panel-head"><div class="t"><h2>3. 議題</h2><span class="small muted">'+(d.topics.length?'共 '+d.topics.length+' 個':'這場會議要討論什麼？在下面新增，也可以開會時再加')+'</span></div></div>';
   if(d.topics.length)h+='<ul class="chips">'+d.topics.map((t,i)=>'<li><span><b class="num">'+(i+1)+'.</b> '+esc(t.title)+'</span><button class="icon-btn" aria-label="刪除議題 '+esc(t.title)+'" data-act="draft-del" data-i="'+i+'">✕</button></li>').join('')+'</ul>';
   h+='<div class="addline"><label class="sr" for="n-topic">新議題</label><input id="n-topic" class="in" data-draft="newTopic" data-enter="draft-add" value="'+esc(d.newTopic)+'" placeholder="輸入新議題，按 Enter 加入"><button class="btn btn-line" data-act="draft-add">＋ 新增議題</button></div></section>';
   h+='<div class="row" style="justify-content:flex-end"><button class="btn btn-ink" data-act="create">建立並開始記錄 →</button></div>';
@@ -702,8 +697,8 @@ app.addEventListener('submit',e=>{
     ui.newGroup=false;put('group',g).catch(()=>alertBox('組別暫時沒存到，連上網路後會自動再存。'));location.hash='#g-'+g.id;render();
   }
   if(f.dataset.form==='settings'){
-    const g=S.group[f.dataset.gid];if(!g||!ui.settings.name.trim())return;
-    const ng=Object.assign(clone(g),{name:ui.settings.name.trim(),schedule:ui.settings.schedule.trim(),members:ui.settings.members.trim()});
+    const g=S.group[f.dataset.gid]||groupById(f.dataset.gid);if(!g||g.virtual||!ui.settings.name.trim())return;
+    const ng=Object.assign(clone(g),{virtualPreset:undefined},{name:ui.settings.name.trim(),schedule:ui.settings.schedule.trim(),members:ui.settings.members.trim()});
     put('group',ng).then(()=>{const m=document.getElementById('setMsg');if(m)m.textContent='已儲存';}).catch(()=>alertBox('設定暫時沒存到，請再按一次儲存。'));
     ui.settings=null;render();const m=document.getElementById('setMsg');if(m)m.textContent='儲存中…';
   }
@@ -722,7 +717,6 @@ function doAct(act,b,e){
     case 'arm': ui.armed=b.dataset.v;render();break;
     case 'disarm': ui.armed='';render();break;
     case 'del-group': {const gid=route().gid;removeObj('group',gid).catch(()=>alertBox('刪除沒有成功，請重新整理後再試。'));location.hash='#home';break;}
-    case 'pick-type': {const d=ui.draft;const k=b.dataset.v;const oldDefault=TYPES[d.type].topics;const keep=d.topics.filter(t=>oldDefault.indexOf(t.title)<0);d.type=k;d.topics=TYPES[k].topics.map(x=>({id:rid(),title:x})).concat(keep);render();break;}
     case 'draft-add': {const d=ui.draft;const el=document.getElementById('n-topic');const v=(el?el.value:d.newTopic).trim();if(!v){if(el)el.focus();break;}d.topics.push({id:rid(),title:v});d.newTopic='';render();const n=document.getElementById('n-topic');if(n)n.focus();break;}
     case 'draft-del': ui.draft.topics.splice(i,1);render();break;
     case 'create': createMeeting(b);break;
@@ -750,9 +744,9 @@ function doAct(act,b,e){
   }
 }
 function createMeeting(btn){
-  const d=ui.draft;const g=groupById(d.gid);if(!g)return;
+  const d=ui.draft;let g=groupById(d.gid);if(!g)return;
   if(!d.title.trim()){const el=document.getElementById('n-title');el.focus();return;}
-  const type=d.type==='custom'?(d.custom.trim()||'自行填寫'):TYPES[d.type].name;
+  g=ensureGroup(g)||g;const type=g.name;
   const m={id:rid(),groupId:g.id,type,title:d.title.trim(),date:d.date,time:d.time,place:d.place,attendees:d.attendees,recorder:d.recorder,topics:d.topics.map(t=>({id:t.id,title:t.title,notes:[]})),decisions:[],createdAt:Date.now()};
   put('meeting',m).catch(()=>alertBox('會議已建立，但暫時沒存到 Google 試算表，連上網路後會自動再存。'));
   cur=clone(S.meeting[m.id]);ui.open={};if(cur.topics[0])ui.open[cur.topics[0].id]=true;
