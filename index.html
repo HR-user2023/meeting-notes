@@ -536,18 +536,19 @@ function viewNew(g){
   crumbs([{t:g.name,href:'#g-'+g.id},{t:'新增會議'}]);
   app.className='narrow';
   let h='<div class="row between"><h1>新增會議</h1><a class="btn btn-ghost" href="#g-'+g.id+'">取消</a></div>';
-  h+='<section class="panel"><h2>1. 會議類型</h2><div class="cards4">'+Object.keys(TYPES).map(k=>{const t=TYPES[k];return '<button class="choice'+(k==='custom'?' dash':'')+'" data-act="pick-type" data-v="'+k+'" aria-pressed="'+(d.type===k)+'"><b>'+t.name+'</b><span class="small muted">'+(t.topics.length?'帶入 '+t.topics.length+' 個議題':'自己取名、自己填議題')+'</span></button>';}).join('')+'</div>'+
+  h+='<section class="panel"><h2>1. 組別</h2><div class="cards4">'+groups().map(x=>'<button class="choice" data-act="pick-group" data-v="'+x.id+'" aria-pressed="'+(d.gid===x.id)+'"><b>'+esc(x.name)+'</b><span class="small muted">'+meetingsOf(x.id).length+' 場會議</span></button>').join('')+
+    '<button class="choice dash" data-act="add-group-inline" aria-pressed="'+(!!d.addingGroup)+'"><b>＋ 新增組別</b><span class="small muted">自己取名字</span></button></div>'+
+    (d.addingGroup?'<div class="addline"><label class="sr" for="n-gname">新組別名稱</label><input id="n-gname" class="in" data-draft="newGroupName" data-enter="create-group-inline" value="'+esc(d.newGroupName||'')+'" placeholder="例如：行銷小組"><button class="btn btn-ink" data-act="create-group-inline">建立組別</button></div>':'')+'</section>';
+  h+='<section class="panel"><h2>2. 會議類型</h2><div class="cards4">'+Object.keys(TYPES).map(k=>{const t=TYPES[k];return '<button class="choice'+(k==='custom'?' dash':'')+'" data-act="pick-type" data-v="'+k+'" aria-pressed="'+(d.type===k)+'"><b>'+t.name+'</b><span class="small muted">'+(t.topics.length?'帶入 '+t.topics.length+' 個議題':'自己取名、自己填議題')+'</span></button>';}).join('')+'</div>'+
     (d.type==='custom'?'<div class="field"><label for="n-ctype">會議類型名稱</label><input id="n-ctype" class="in" data-draft="custom" value="'+esc(d.custom)+'" placeholder="例如：教育訓練會議"></div>':'')+'</section>';
-  const gopts=groups().map(x=>({v:x.id,l:x.name}));
-  h+='<section class="panel"><h2>2. 會議資訊</h2><div class="grid3">'+
-    '<div class="field"><label for="n-group">組別</label><select id="n-group" class="in" data-draft="gid">'+opts(gopts,d.gid)+'</select></div>'+
-    '<div class="field" style="grid-column:span 2"><label for="n-title">會議名稱</label><input id="n-title" class="in" data-draft="title" value="'+esc(d.title)+'"></div>'+
+  h+='<section class="panel"><h2>3. 會議資訊</h2><div class="grid3">'+
+    '<div class="field full"><label for="n-title">會議名稱</label><input id="n-title" class="in" data-draft="title" value="'+esc(d.title)+'"></div>'+
     '<div class="field"><label for="n-date">日期</label><input id="n-date" type="date" class="in" data-draft="date" value="'+esc(d.date)+'"></div>'+
     '<div class="field"><label for="n-time">時間</label><input id="n-time" class="in" data-draft="time" value="'+esc(d.time)+'" placeholder="09:00–10:00"></div>'+
     '<div class="field"><label for="n-place">地點</label><input id="n-place" class="in" data-draft="place" value="'+esc(d.place)+'"></div>'+
     '<div class="field" style="grid-column:span 2"><label for="n-att">參加者</label><input id="n-att" class="in" data-draft="attendees" value="'+esc(d.attendees)+'"></div>'+
     '<div class="field"><label for="n-rec">記錄人</label><input id="n-rec" class="in" data-draft="recorder" value="'+esc(d.recorder)+'"></div></div></section>';
-  h+='<section class="panel"><div class="panel-head"><div class="t"><h2>3. 議題</h2><span class="small muted">'+(d.topics.length?'共 '+d.topics.length+' 個，可以增減':'還沒有議題，在下面新增')+'</span></div></div>';
+  h+='<section class="panel"><div class="panel-head"><div class="t"><h2>4. 議題</h2><span class="small muted">'+(d.topics.length?'共 '+d.topics.length+' 個，可以增減':'還沒有議題，在下面新增')+'</span></div></div>';
   if(d.topics.length)h+='<ul class="chips">'+d.topics.map((t,i)=>'<li><span><b class="num">'+(i+1)+'.</b> '+esc(t.title)+'</span><button class="icon-btn" aria-label="刪除議題 '+esc(t.title)+'" data-act="draft-del" data-i="'+i+'">✕</button></li>').join('')+'</ul>';
   h+='<div class="addline"><label class="sr" for="n-topic">新議題</label><input id="n-topic" class="in" data-draft="newTopic" data-enter="draft-add" value="'+esc(d.newTopic)+'" placeholder="輸入新議題，按 Enter 加入"><button class="btn btn-line" data-act="draft-add">＋ 新增議題</button></div></section>';
   h+='<div class="row" style="justify-content:flex-end"><button class="btn btn-ink" data-act="create">建立並開始記錄 →</button></div>';
@@ -725,6 +726,11 @@ function doAct(act,b,e){
     case 'draft-add': {const d=ui.draft;const el=document.getElementById('n-topic');const v=(el?el.value:d.newTopic).trim();if(!v){if(el)el.focus();break;}d.topics.push({id:rid(),title:v});d.newTopic='';render();const n=document.getElementById('n-topic');if(n)n.focus();break;}
     case 'draft-del': ui.draft.topics.splice(i,1);render();break;
     case 'create': createMeeting(b);break;
+    case 'pick-group': {const g=groupById(b.dataset.v);if(!g)break;const d=ui.draft;d.gid=g.id;d.addingGroup=false;if(d.titleAuto)d.title=nthTitle(g);if(g.members)d.attendees=g.members;location.hash='#new-'+g.id;break;}
+    case 'add-group-inline': ui.draft.addingGroup=!ui.draft.addingGroup;render();setTimeout(()=>{const n=document.getElementById('n-gname');if(n)n.focus();},0);break;
+    case 'create-group-inline': {const d=ui.draft;const el=document.getElementById('n-gname');const name=(el?el.value:d.newGroupName||'').trim();if(!name){if(el)el.focus();break;}
+      const g={id:rid(),name,schedule:'',members:'',createdAt:Date.now()};put('group',g).catch(()=>alertBox('組別暫時沒存到，連上網路後會自動再存。'));
+      d.gid=g.id;d.addingGroup=false;d.newGroupName='';if(d.titleAuto)d.title=nthTitle(g);location.hash='#new-'+g.id;break;}
     case 'toggle': {const id=b.dataset.tid;ui.open[id]=!ui.open[id];rerenderMeeting();break;}
     case 'toggle-all': {const all=cur.topics.every(t=>ui.open[t.id]);ui.open={};if(!all)cur.topics.forEach(t=>ui.open[t.id]=true);rerenderMeeting();break;}
     case 'add-note': {const t=cur.topics[i];const el=document.getElementById('nn-'+t.id);const v=el?el.value.trim():'';if(!v){if(el)el.focus();break;}t.notes=t.notes||[];t.notes.push(v);scheduleSave();rerenderMeeting('nn-'+t.id);break;}
