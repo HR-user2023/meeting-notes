@@ -118,12 +118,22 @@ select.in{padding:0 8px}
 .item{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
 .item.stuck{border:2px solid var(--ink)}
 .tl{margin:0 0 0 6px;padding:0;list-style:none;border-left:2px solid var(--line);display:flex;flex-direction:column}
-.tl li{padding:0 0 10px 16px;display:flex;flex-direction:column;gap:2px}
-.tl li:last-child{padding-bottom:0}
+.tl>li{padding:0 0 10px 16px;display:flex;flex-direction:column;gap:2px}
+.tl>li:last-child{padding-bottom:0}
 .tl .when{font-size:12px;font-weight:600;color:var(--muted)}
 .tl .old{color:var(--muted)}
 .rp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .help-box{background:var(--sunk);border-radius:8px;padding:10px 12px}
+.plist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.blk{background:var(--soft);border-left:3px solid var(--ink);border-radius:0 8px 8px 0;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.blk .who{display:block;font-size:13px;color:var(--muted)}
+.rsec{display:flex;flex-direction:column;gap:8px}
+.rsec-h{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-weight:700}
+.rhead,.rrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) 44px;gap:8px;align-items:center}
+.rhead.b,.rrow.b{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) minmax(0,1fr) 44px}
+.rhead{font-size:12px;color:var(--muted)}
+.rsec.stuckbox{background:var(--sunk);border-radius:10px;padding:12px}
+@media (max-width:600px){.rhead{display:none}.rrow,.rrow.b{grid-template-columns:minmax(0,1fr) 44px}.rrow .ri{grid-column:1}.rrow .rx{grid-column:2;grid-row:1}.rrow .rd,.rrow .rh{grid-column:1/-1}}
 .empty{background:var(--surface);border:1px dashed var(--line-strong);border-radius:12px;padding:28px 20px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center}
 .notice{border-radius:12px;padding:12px 16px;background:var(--soft);font-size:14px}
 .ok{border-radius:12px;padding:14px 18px;background:var(--ink);color:var(--on-ink);font-weight:600}
@@ -171,6 +181,10 @@ table.t td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:t
 .shot .tx{font-size:17px;white-space:pre-line}
 .shot .sm{font-size:13px;color:#5C5C5C}
 .shot .hp{font-size:16px;font-weight:700}
+.shot .plist{margin:0;padding-left:24px;font-size:17px;display:flex;flex-direction:column;gap:2px}
+.shot .blk{background:#FFFFFF;border-left:4px solid #171717;border-radius:0 8px 8px 0;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.shot .blk .who{display:block;font-size:15px;color:#5C5C5C}
+.shot .lbl{font-size:14px;font-weight:700;color:#5C5C5C}
 .shot .sb{display:flex;align-items:center;gap:10px}
 .shot .sb .tr{flex:1 1 auto;height:10px;border-radius:999px;background:#E2E2E2;overflow:hidden}
 .shot .sb .fl{height:10px;border-radius:999px;background:#171717}
@@ -214,6 +228,12 @@ const CACHE_KEY = 'meeting-v2-cache';
 const PRESETS = [{id:'ops',name:'營運會議',createdAt:1},{id:'store',name:'門市會議',createdAt:2}];
 const STATUS = ['進行中','已完成','卡關，需要協助'];
 const STUCK = '卡關，需要協助';
+function progOf(r){if(!r)return [];if(Array.isArray(r.progress)&&r.progress.length)return r.progress;return String(r.text||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>({item:'',desc:x}));}
+function blkOf(r){if(!r)return [];if(Array.isArray(r.blockers)&&r.blockers.length)return r.blockers;return r.help?[{item:'',desc:r.help,helper:''}]:[];}
+function liTxt(x){return (x.item?'<b>'+esc(x.item)+'</b>'+(x.desc?'：':''):'')+esc(x.desc||'');}
+function progHtml(r){const l=progOf(r);return l.length?'<ul class="plist">'+l.map(x=>'<li>'+liTxt(x)+'</li>').join('')+'</ul>':'';}
+function blkHtml(r){const l=blkOf(r);return l.length?'<div class="blk"><b class="small">卡關・需要協助</b><ul class="plist">'+l.map(x=>'<li>'+liTxt(x)+(x.helper?'<span class="who">→ 可協助：'+esc(x.helper)+'</span>':'')+'</li>').join('')+'</ul></div>':'';}
+function progShort(r){return progOf(r).map(x=>x.item?x.item+(x.desc?'：'+x.desc:''):x.desc).join('；');}
 const WD = ['日','一','二','三','四','五','六'];
 const clientId = Math.random().toString(36).slice(2);
 const app = document.getElementById('app');
@@ -515,8 +535,7 @@ function itemCard(it){
   let h='<section class="item'+(it.status===STUCK?' stuck':'')+'"><div class="prog-h"><span class="tt" style="font-size:17px">'+esc(it.title)+'</span><span class="small">'+esc(it.owner)+'</span><span class="pill '+di.cls+'">'+esc(di.txt)+'</span>'+statusPill(it)+'</div>';
   h+=bar(it.pct);
   const dc=dueChange(it);if(dc&&!it.closed)h+='<span class="small muted">'+esc(dc)+'</span>';
-  if(it.help)h+='<b class="small">需要協助：'+esc(it.help)+'</b>';
-  h+='<ol class="tl">'+it.reps.map((r,i)=>'<li><span class="when">'+fmtDate(r.date)+' '+esc(r.who||'')+' 回報 · '+esc(r.status||'')+' · '+(r.pct||0)+'%'+(i===0?' · 最新':'')+'</span><span'+(i?' class="old"':'')+' style="white-space:pre-line">'+esc(r.text||'')+'</span>'+(r.help?'<span class="small">需要協助：'+esc(r.help)+'</span>':'')+'</li>').join('')+
+  h+='<ol class="tl">'+it.reps.map((r,i)=>'<li><span class="when">'+fmtDate(r.date)+' '+esc(r.who||'')+' 回報 · '+esc(r.status||'')+' · '+(r.pct||0)+'%'+(i===0?' · 最新':'')+'</span><div'+(i?' class="old"':'')+' style="display:flex;flex-direction:column;gap:4px">'+progHtml(r)+blkHtml(r)+'</div></li>').join('')+
     '<li><span class="when">'+fmtDate(it.m.date)+' '+esc(it.m.title||'')+' · 開始追蹤</span><span class="old">會議決議：'+esc(it.title)+(it.origDue?'，'+md(it.origDue)+' 前完成':'')+'</span></li></ol>';
   return h+'</section>';
 }
@@ -568,9 +587,9 @@ function progSection(m){
   let h='<div class="panel-head"><div class="t"><h2>1. 進度回報</h2><span class="small muted">自動帶入負責人在「我要回報進度」填的內容，這裡不用填</span></div>'+(p.items.length?'<b class="small">已回報 '+p.reported+' / '+p.items.length+' 項</b>':'')+'</div>';
   if(!p.items.length)return h+'<p class="muted small" style="margin:0">'+(p.prev?'目前沒有需要回報的項目。':'這是這個組別的第一場會議，還沒有需要回報的項目。')+'</p>';
   return h+p.items.map(it=>{
-    if(!it.reported&&!it.closed)return '<div class="prog miss"><div class="prog-h"><span class="tt">'+esc(it.title)+'</span><span class="small">'+esc(it.owner)+'</span><span class="pill ink">還沒回報</span></div>'+(it.last?'<span class="small muted">上次（'+md(it.last.date)+'）：'+esc(it.last.text)+'</span>':'<span class="small muted">來自 '+fmtDate(it.m.date)+' 會議決議'+(it.origDue?'，'+md(it.origDue)+' 前完成':'')+'</span>')+'</div>';
+    if(!it.reported&&!it.closed)return '<div class="prog miss"><div class="prog-h"><span class="tt">'+esc(it.title)+'</span><span class="small">'+esc(it.owner)+'</span><span class="pill ink">還沒回報</span></div>'+(it.last?'<span class="small muted">上次（'+md(it.last.date)+'）：'+esc(progShort(it.last))+'</span>':'<span class="small muted">來自 '+fmtDate(it.m.date)+' 會議決議'+(it.origDue?'，'+md(it.origDue)+' 前完成':'')+'</span>')+'</div>';
     const r=it.last;const dc=dueChange(it);
-    return '<div class="prog"><div class="prog-h"><span class="tt">'+esc(it.title)+'</span><span class="small">'+esc(it.owner)+'</span>'+statusPill(it)+'</div><span style="white-space:pre-line">'+esc(r?r.text:'')+'</span>'+bar(it.pct)+(it.help?'<b class="small">需要協助：'+esc(it.help)+'</b>':'')+'<span class="small muted">'+(r?fmtDate(r.date)+' '+esc(r.who||'')+' 回報':'')+(dc&&!it.closed?' · '+esc(dc):'')+'</span></div>';
+    return '<div class="prog"><div class="prog-h"><span class="tt">'+esc(it.title)+'</span><span class="small">'+esc(it.owner)+'</span>'+statusPill(it)+'</div>'+progHtml(r)+(it.closed?'':blkHtml(r))+bar(it.pct)+'<span class="small muted">'+(r?fmtDate(r.date)+' '+esc(r.who||'')+' 回報':'')+(dc&&!it.closed?' · '+esc(dc):'')+'</span></div>';
   }).join('');
 }
 function viewMeeting(){
@@ -641,27 +660,40 @@ function viewReport(){
   if(!who)return h+'<div class="empty"><b>先選你的名字</b></div>';
   if(!mine.length)return h+'<div class="empty"><b>目前沒有需要回報的項目</b><span class="muted small">會議決議裡，負責人填你名字的事情，會自動出現在這裡。</span></div>';
   h+=mine.map(it=>{
-    const dr=ui.reportDraft[it.key]||(ui.reportDraft[it.key]={text:'',status:STATUS.indexOf(it.status)>=0?it.status:'進行中',pct:it.pct,due:it.due||'',help:it.help||''});
+    const dr=ui.reportDraft[it.key]||(ui.reportDraft[it.key]={prog:[{item:'',desc:''}],blk:[],status:'進行中',pct:it.pct,due:it.due||''});
     const di=dueInfo(it);const k=esc(it.key);const id='rp'+it.m.id+it.d.id;
     let c='<section class="item"><div class="prog-h"><span class="tag">'+esc(groupById(it.gid).name)+'</span><span class="tt" style="font-size:17px">'+esc(it.title)+'</span><span class="pill '+di.cls+'">'+esc(di.txt)+'</span></div>';
-    c+='<span class="small muted">'+(it.last?'上次（'+md(it.last.date)+'）：'+esc(it.last.text)+' · '+it.pct+'%':'還沒有回報紀錄（來自 '+fmtDate(it.m.date)+' '+esc(it.m.title||'')+'）')+'</span>';
-    c+='<div class="field"><label for="'+id+'-t">這次進度</label><textarea id="'+id+'-t" class="in" data-rp="text" data-k="'+k+'" placeholder="寫一句目前做到哪裡">'+esc(dr.text)+'</textarea></div>';
-    c+='<div class="rp-grid"><div class="field"><label for="'+id+'-s">狀態</label><select id="'+id+'-s" class="in" data-rp="status" data-k="'+k+'">'+opts(STATUS,dr.status)+'</select></div>'+
+    c+='<span class="small muted">'+(it.last?'上次（'+md(it.last.date)+'）：'+esc(progShort(it.last))+' · '+it.pct+'%':'還沒有回報紀錄（來自 '+fmtDate(it.m.date)+' '+esc(it.m.title||'')+'）')+'</span>';
+    c+='<div class="rsec"><div class="rsec-h">目前進度<span class="small muted" style="font-weight:400">一列寫一件事</span></div><div class="rhead"><span>項目</span><span>說明</span><span></span></div>'+
+      dr.prog.map((x,j)=>'<div class="rrow"><input class="in ri" aria-label="項目" placeholder="項目，例如：招牌報價" data-rl="prog" data-k="'+k+'" data-i="'+j+'" data-f="item" value="'+esc(x.item)+'"><input class="in rd" aria-label="說明" placeholder="說明，例如：廠商報價 3.2 萬" data-rl="prog" data-k="'+k+'" data-i="'+j+'" data-f="desc" value="'+esc(x.desc)+'"><button class="icon-btn rx" aria-label="刪除這一列" data-act="rl-del" data-l="prog" data-k="'+k+'" data-i="'+j+'">✕</button></div>').join('')+
+      '<div><button class="btn btn-ghost" data-act="rl-add" data-l="prog" data-k="'+k+'">＋ 再加一列進度</button></div></div>';
+    c+='<div class="rsec'+(dr.blk.length?' stuckbox':'')+'"><div class="rsec-h">卡關協助<span class="small muted" style="font-weight:400">沒有可以不填，有填會標成「卡關」</span></div>'+
+      (dr.blk.length?'<div class="rhead b"><span>項目</span><span>說明</span><span>可協助人選</span><span></span></div>':'')+
+      dr.blk.map((x,j)=>'<div class="rrow b"><input class="in ri" aria-label="卡關項目" placeholder="項目" data-rl="blk" data-k="'+k+'" data-i="'+j+'" data-f="item" value="'+esc(x.item)+'"><input class="in rd" aria-label="說明" placeholder="說明，例如：預算還沒核准" data-rl="blk" data-k="'+k+'" data-i="'+j+'" data-f="desc" value="'+esc(x.desc)+'"><input class="in rh" aria-label="可協助人選" list="rpPeople" placeholder="可協助人選" data-rl="blk" data-k="'+k+'" data-i="'+j+'" data-f="helper" value="'+esc(x.helper)+'"><button class="icon-btn rx" aria-label="刪除這一列" data-act="rl-del" data-l="blk" data-k="'+k+'" data-i="'+j+'">✕</button></div>').join('')+
+      '<div><button class="btn btn-ghost" data-act="rl-add" data-l="blk" data-k="'+k+'">＋ '+(dr.blk.length?'再加一列卡關':'有卡關，新增一列')+'</button></div></div>';
+    c+='<div class="rp-grid"><div class="field"><label for="'+id+'-s">狀態</label><select id="'+id+'-s" class="in" data-rp="status" data-k="'+k+'">'+opts(['進行中','已完成'],dr.status)+'</select></div>'+
       '<div class="field"><label for="'+id+'-p">完成度</label><select id="'+id+'-p" class="in" data-rp="pct" data-k="'+k+'"'+(dr.status==='已完成'?' disabled':'')+'>'+opts(PCTS,dr.status==='已完成'?100:dr.pct)+'</select></div>'+
       '<div class="field"><label for="'+id+'-d">預計完成日</label><input id="'+id+'-d" type="date" class="in" data-rp="due" data-k="'+k+'" value="'+esc(dr.due)+'"></div></div>';
-    if(dr.status===STUCK)c+='<div class="field help-box"><label for="'+id+'-h" style="color:var(--fg);font-weight:600">需要誰協助？</label><input id="'+id+'-h" class="in" data-rp="help" data-k="'+k+'" value="'+esc(dr.help)+'" placeholder="例如：需要區經理核准預算"></div>';
     return c+'</section>';
   }).join('');
-  const filled=mine.filter(i=>(ui.reportDraft[i.key]&&ui.reportDraft[i.key].text||'').trim()).length;
+  const filled=mine.filter(i=>draftFilled(ui.reportDraft[i.key])).length;
+  h+='<datalist id="rpPeople">'+people.map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>';
   h+='<div class="row" style="justify-content:flex-end"><span class="small muted" id="rpCount">已填 '+filled+' / '+mine.length+' 項，沒填的可以下次再回報</span><button class="btn btn-ink" data-act="submit-report" style="min-height:48px;font-size:16px;padding:0 26px">送出回報</button></div>';
   return h;
 }
+function draftFilled(d){return !!d&&(d.prog.some(x=>(x.item+x.desc).trim())||d.blk.some(x=>(x.item+x.desc+x.helper).trim()));}
 function submitReport(btn){
   const who=ui.reportWho;const open=buildItems().filter(i=>!i.closed&&i.owners.indexOf(who)>=0);
   const t=todayStr(),now=Date.now();
-  const reps=open.map(it=>{const d=ui.reportDraft[it.key];if(!d||!String(d.text||'').trim())return null;
-    return {id:rid(),itemKey:it.key,date:t,at:now,who:who,text:d.text.trim(),status:d.status,pct:d.status==='已完成'?100:Number(d.pct)||0,due:d.due||'',help:d.status===STUCK?String(d.help||'').trim():''};}).filter(Boolean);
-  if(!reps.length){const c=document.getElementById('rpCount');if(c)c.textContent='請至少填一項「這次進度」。';return;}
+  const reps=open.map(it=>{const d=ui.reportDraft[it.key];if(!draftFilled(d))return null;
+    const prog=d.prog.map(x=>({item:x.item.trim(),desc:x.desc.trim()})).filter(x=>x.item||x.desc);
+    const blk=d.blk.map(x=>({item:x.item.trim(),desc:x.desc.trim(),helper:x.helper.trim()})).filter(x=>x.item||x.desc||x.helper);
+    const status=d.status==='已完成'?'已完成':(blk.length?STUCK:'進行中');
+    return {id:rid(),itemKey:it.key,date:t,at:now,who:who,progress:prog,blockers:blk,
+      text:prog.map(x=>x.item?x.item+(x.desc?'：'+x.desc:''):x.desc).join('\n'),
+      help:blk.map(x=>[x.item,x.desc].filter(Boolean).join('：')+(x.helper?'（可協助：'+x.helper+'）':'')).join('\n'),
+      status,pct:status==='已完成'?100:Number(d.pct)||0,due:d.due||''};}).filter(Boolean);
+  if(!reps.length){const c=document.getElementById('rpCount');if(c)c.textContent='請至少填一列「目前進度」。';return;}
   btn.disabled=true;btn.textContent='送出中…';
   reps.forEach(r=>delete ui.reportDraft[r.itemKey]);
   ui.reportOk='✓ 已送出 '+reps.length+' 項回報，謝謝！下次開會會自動帶入。';
@@ -675,7 +707,7 @@ app.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.draft&&ui.draft){ui.draft[t.dataset.draft]=t.value;if(t.dataset.draft==='title')ui.draft.titleAuto=false;return;}
   if(t.dataset.set&&ui.settings){ui.settings[t.dataset.set]=t.value;return;}
-  if(t.dataset.rp&&t.tagName!=='SELECT'){const d=ui.reportDraft[t.dataset.k];if(d){d[t.dataset.rp]=t.value;if(t.dataset.rp==='text'){const c=document.getElementById('rpCount');if(c){const who=ui.reportWho;const mine=buildItems().filter(i=>!i.closed&&i.owners.indexOf(who)>=0);c.textContent='已填 '+mine.filter(i=>(ui.reportDraft[i.key]&&ui.reportDraft[i.key].text||'').trim()).length+' / '+mine.length+' 項，沒填的可以下次再回報';}}}return;}
+  if(t.dataset.rl){const d=ui.reportDraft[t.dataset.k];if(d){d[t.dataset.rl][Number(t.dataset.i)][t.dataset.f]=t.value;const c=document.getElementById('rpCount');if(c){const who=ui.reportWho;const mine=buildItems().filter(i=>!i.closed&&i.owners.indexOf(who)>=0);c.textContent='已填 '+mine.filter(i=>draftFilled(ui.reportDraft[i.key])).length+' / '+mine.length+' 項，沒填的可以下次再回報';}}return;}
   if(t.dataset.bind&&cur&&t.tagName!=='SELECT'&&t.type!=='date'){
     setPath(cur,t.dataset.bind,t.value);
     if(t.dataset.typeOf){const el=document.getElementById('ty-'+t.dataset.typeOf);if(el)el.innerHTML=names(t.value).length?'<span class="pill soft">進度追蹤</span>':'<span class="pill">只記錄決議</span>';}
@@ -748,6 +780,9 @@ function doAct(act,b,e){
     case 'del-dec': cur.decisions.splice(i,1);scheduleSave();rerenderMeeting();break;
     case 'del-meeting': {const id=cur.id;const gid=gidOf(cur);clearTimeout(saveTimer);saveTimer=null;cur=null;removeObj('meeting',id).catch(()=>alertBox('刪除沒有成功，請重新整理後再試。'));location.hash='#g-'+gid;break;}
     case 'submit-report': submitReport(b);break;
+    case 'rl-add': {const d=ui.reportDraft[b.dataset.k];if(!d)break;const l=b.dataset.l;d[l].push(l==='blk'?{item:'',desc:'',helper:''}:{item:'',desc:''});const y=window.scrollY;render();window.scrollTo(0,y);
+      const ins=app.querySelectorAll('input[data-rl="'+l+'"][data-f="item"]');const tgt=[...ins].filter(x=>x.dataset.k===b.dataset.k).pop();if(tgt)tgt.focus();break;}
+    case 'rl-del': {const d=ui.reportDraft[b.dataset.k];if(!d)break;d[b.dataset.l].splice(i,1);if(b.dataset.l==='prog'&&!d.prog.length)d.prog.push({item:'',desc:''});const y=window.scrollY;render();window.scrollTo(0,y);break;}
     case 'dl-mimg': saveImage(meetingShot(cur),fileName(cur.date+' '+(cur.title||'會議記錄'))+'.png');break;
     case 'dl-mxls': meetingXlsx(cur);break;
     case 'dl-brief': {const g=groupById(b.dataset.gid);saveImage(briefShot(g),fileName(g.name+' 會前資料 '+todayStr())+'.png');break;}
@@ -784,9 +819,9 @@ async function saveImage(html,name){
 function shotFoot(g,extra){return '<div class="ft"><span>會議記錄系統 · '+esc(g.name)+(extra?' · '+esc(extra):'')+'</span><span>下載於 '+fmtFull(todayStr())+'</span></div>';}
 function shotProg(items){
   return items.map(it=>{
-    if(!it.reported&&!it.closed)return '<div class="box miss"><div class="bh"><span class="bt">'+esc(it.title)+'</span><span class="bs" style="color:#171717;font-weight:700">'+esc(it.owner)+' · 還沒回報</span></div>'+(it.last?'<span class="tx" style="color:#5C5C5C">上次：'+esc(it.last.text)+'</span>':'')+'</div>';
+    if(!it.reported&&!it.closed)return '<div class="box miss"><div class="bh"><span class="bt">'+esc(it.title)+'</span><span class="bs" style="color:#171717;font-weight:700">'+esc(it.owner)+' · 還沒回報</span></div>'+(it.last?'<span class="tx" style="color:#5C5C5C">上次：'+esc(progShort(it.last))+'</span>':'')+'</div>';
     const r=it.last;const dc=dueChange(it);
-    return '<div class="box"><div class="bh"><span class="bt">'+esc(it.title)+'</span><span class="bs">'+esc(it.owner)+' · '+esc(it.status==='已完成'?'已完成':it.status)+'</span></div><span class="tx">'+esc(r?r.text:'')+'</span>'+sbar(it.pct)+(it.help?'<span class="hp">需要協助：'+esc(it.help)+'</span>':'')+'<span class="sm">'+(r?md(r.date)+' 回報':'')+(dc&&!it.closed?' · '+esc(dc):'')+'</span></div>';
+    return '<div class="box"><div class="bh"><span class="bt">'+esc(it.title)+'</span><span class="bs">'+esc(it.owner)+' · '+esc(it.status==='已完成'?'已完成':it.status)+'</span></div>'+(progOf(r).length?'<span class="lbl">目前進度</span>'+progHtml(r):'')+(it.closed?'':blkHtml(r))+sbar(it.pct)+'<span class="sm">'+(r?md(r.date)+' 回報':'')+(dc&&!it.closed?' · '+esc(dc):'')+'</span></div>';
   }).join('');
 }
 function shotTopics(m){
@@ -861,9 +896,9 @@ function detailShot(g,dd,o){
   h+='<div class="sec"><span class="st">一、總覽</span><table><thead><tr><th>項目</th><th style="width:96px">負責人</th><th style="width:120px">狀態</th><th style="width:76px">完成度</th><th style="width:104px">預計完成</th><th style="width:92px">最後回報</th></tr></thead><tbody>'+
     its.map(i=>'<tr><td style="font-weight:600">'+esc(i.title)+'</td><td>'+esc(i.owner)+'</td><td>'+esc(i.status===STUCK?'卡關':i.status)+'</td><td style="font-family:Inter,sans-serif;font-weight:700">'+i.pct+'%</td><td>'+(i.due?md(i.due):'—')+(i.origDue&&i.due!==i.origDue?'<br><span style="font-size:13px;color:#5C5C5C">原 '+md(i.origDue)+'</span>':'')+'</td><td>'+(i.last?md(i.last.date):'<b>還沒回報</b>')+'</td></tr>').join('')+'</tbody></table></div>';
   h+='<div class="sec"><span class="st">二、各項目完整紀錄</span>'+its.map((i,n)=>{
-    const rows=i.rng.map(r=>'<tr><td>'+fmtDate(r.date)+'</td><td>'+esc(r.who||'')+'</td><td style="white-space:pre-line">'+esc(r.text||'')+(r.help?'<br><b>需要協助：'+esc(r.help)+'</b>':'')+'</td><td style="font-family:Inter,sans-serif">'+(r.pct||0)+'%</td><td>'+esc(r.status===STUCK?'卡關':r.status||'')+'</td></tr>').join('')+
+    const rows=i.rng.map(r=>'<tr><td>'+fmtDate(r.date)+'</td><td>'+esc(r.who||'')+'</td><td>'+progHtml(r)+blkHtml(r)+'</td><td style="font-family:Inter,sans-serif">'+(r.pct||0)+'%</td><td>'+esc(r.status===STUCK?'卡關':r.status||'')+'</td></tr>').join('')+
       (o.range==='all'?'<tr><td>'+fmtDate(i.m.date)+'</td><td style="color:#5C5C5C">會議決議</td><td style="color:#5C5C5C">'+esc(i.title)+(i.origDue?'，'+md(i.origDue)+' 前完成':'')+'</td><td style="font-family:Inter,sans-serif">0%</td><td>開始</td></tr>':'');
-    return '<div class="card'+(!i.closed&&!i.last?' miss':'')+'"><div class="bh"><span style="font-size:20px;font-weight:700">'+(n+1)+'. '+esc(i.title)+'</span><span style="font-size:14px;font-weight:700">'+esc(i.status)+'</span></div><div class="kv"><span><span>負責人：</span>'+esc(i.owner)+'</span><span><span>來源：</span>'+md(i.m.date)+' '+esc(i.m.title||'')+'</span><span><span>原本期限：</span>'+(i.origDue?md(i.origDue):'—')+'</span><span><span>預計完成：</span>'+(i.due?md(i.due):'—')+'</span>'+(i.help?'<span style="grid-column:1/-1"><span>需要協助：</span><b>'+esc(i.help)+'</b></span>':'')+'</div>'+sbar(i.pct)+
+    return '<div class="card'+(!i.closed&&!i.last?' miss':'')+'"><div class="bh"><span style="font-size:20px;font-weight:700">'+(n+1)+'. '+esc(i.title)+'</span><span style="font-size:14px;font-weight:700">'+esc(i.status)+'</span></div><div class="kv"><span><span>負責人：</span>'+esc(i.owner)+'</span><span><span>來源：</span>'+md(i.m.date)+' '+esc(i.m.title||'')+'</span><span><span>原本期限：</span>'+(i.origDue?md(i.origDue):'—')+'</span><span><span>預計完成：</span>'+(i.due?md(i.due):'—')+'</span></div>'+(i.closed?'':blkHtml(i.last))+sbar(i.pct)+
       (rows?'<table><thead><tr><th style="width:110px">日期</th><th style="width:84px">回報人</th><th>進度內容</th><th style="width:70px">完成度</th><th style="width:72px">狀態</th></tr></thead><tbody>'+rows+'</tbody></table>':'<span class="sm">這段期間沒有回報</span>')+'</div>';
   }).join('')+'</div>';
   return h+shotFoot(g,'進度明細')+'</div>';
