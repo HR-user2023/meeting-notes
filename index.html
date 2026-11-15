@@ -460,7 +460,7 @@ function newGroupForm(){
   return '<form class="panel" data-form="group" style="grid-column:1/-1"><h2>新增組別</h2><div class="grid2">'+
     '<div class="field"><label for="ng-name">組別名稱</label><input id="ng-name" class="in" required placeholder="例如：店點例會"></div>'+
     '<div class="field"><label for="ng-sch">開會時間（可不填）</label><input id="ng-sch" class="in" placeholder="例如：每週一 09:00"></div>'+
-    '<div class="field full"><label for="ng-mem">成員（用頓號分開，回報進度時會用到）</label><input id="ng-mem" class="in" placeholder="王小明、陳美玲、林志豪"></div></div>'+
+    '<div class="field full"><label for="ng-mem">成員（可不填，用頓號分開）</label><input id="ng-mem" class="in" placeholder="王小明、陳美玲、林志豪"></div></div>'+
     '<div class="row" style="justify-content:flex-end"><button type="button" class="btn btn-ghost" data-act="cancel-group">取消</button><button class="btn btn-ink">建立組別</button></div></form>';
 }
 
@@ -468,7 +468,7 @@ function newGroupForm(){
 function groupHead(g,tab){
   const s=groupStats(g.id);
   crumbs([{t:g.name}]);
-  let h='<div class="row between" style="align-items:flex-end"><div style="display:flex;flex-direction:column;gap:2px"><h1>'+esc(g.name)+'</h1><span class="muted small">'+esc([g.schedule,g.members?'成員：'+names(g.members).join('、'):''].filter(Boolean).join(' · ')||'還沒設定開會時間和成員')+'</span></div>'+
+  let h='<div class="row between" style="align-items:flex-end"><div style="display:flex;flex-direction:column;gap:2px"><h1>'+esc(g.name)+'</h1><span class="muted small">'+esc([g.schedule,g.members?'成員：'+names(g.members).join('、'):''].filter(Boolean).join(' · ')||'　')+'</span></div>'+
     '<div class="row"><button class="btn btn-line" data-act="dl-brief" data-gid="'+g.id+'">⬇ 下載會前資料</button>'+(g.virtual?'':'<a class="btn btn-ink" href="#new-'+g.id+'">＋ 新增'+esc(g.name)+'</a>')+'</div></div>';
   h+='<nav class="tabsbar" aria-label="組別內容"><a href="#g-'+g.id+'"'+(tab==='group'?' aria-current="page"':'')+'>會議記錄（'+s.meetings+'）</a><a href="#g-'+g.id+'-progress"'+(tab==='progress'?' aria-current="page"':'')+'>進度回報（'+s.open+'）</a>'+(g.virtual?'':'<a href="#g-'+g.id+'-settings"'+(tab==='settings'?' aria-current="page"':'')+'>組別設定</a>')+'</nav>';
   return h;
@@ -518,7 +518,7 @@ function viewSettings(g){
   h+='<form class="panel" data-form="settings" data-gid="'+g.id+'"><div class="grid2">'+
     '<div class="field"><label for="gs-name">組別名稱</label><input id="gs-name" class="in" required data-set="name" value="'+esc(st.name)+'"></div>'+
     '<div class="field"><label for="gs-sch">開會時間</label><input id="gs-sch" class="in" data-set="schedule" value="'+esc(st.schedule)+'" placeholder="例如：每週一 09:00"></div>'+
-    '<div class="field full"><label for="gs-mem">成員（用頓號分開）</label><input id="gs-mem" class="in" data-set="members" value="'+esc(st.members)+'" placeholder="王小明、陳美玲"></div></div>'+
+    '<div class="field full"><label for="gs-mem">成員（可不填，用頓號分開）</label><input id="gs-mem" class="in" data-set="members" value="'+esc(st.members)+'" placeholder="王小明、陳美玲"></div></div>'+
     '<div class="row" style="justify-content:flex-end"><span class="small muted" id="setMsg"></span><button class="btn btn-ink">儲存設定</button></div></form>';
   h+='<section class="panel"><h2>刪除組別</h2>'+(n?'<p class="muted small" style="margin:0">這個組別還有 '+n+' 場會議，要先刪除會議才能刪除組別。</p>':'<div><button class="btn btn-danger'+(ui.armed==='group'?' armed':'')+'" data-act="'+(ui.armed==='group'?'del-group':'arm')+'" data-v="group">'+(ui.armed==='group'?'確定刪除？再按一次':'刪除這個組別')+'</button></div>')+'</section>';
   return h;
@@ -571,7 +571,7 @@ function viewMeeting(){
   app.className='narrow';
   const topics=m.topics||[],decs=m.decisions||[];
   const allOpen=topics.length&&topics.every(t=>ui.open[t.id]);
-  const mem=memberNames(gidOf(m)).concat(names(m.attendees));
+  const mem=memberNames(gidOf(m)).concat(names(m.attendees)).concat(list('meeting').flatMap(x=>(x.decisions||[]).flatMap(d=>names(d.owner))));
   let h='<div class="row between"><span class="save-state" id="saveState" role="status">'+esc(saveState)+'</span><div class="row"><button class="btn" data-act="dl-mimg">⬇ 下載圖片</button><button class="btn" data-act="dl-mxls">⬇ Excel</button></div></div>';
   h+='<datalist id="people">'+[...new Set(mem)].map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>';
   h+='<section class="panel"><div class="row"><span class="tag">組別：'+esc(g.name)+'</span>'+(m.type?'<span class="tag">'+esc(m.type)+'</span>':'')+'</div><div class="grid3">'+
@@ -629,7 +629,7 @@ function viewReport(){
   if(who&&mine.length)h+='<span class="muted small" style="padding-bottom:10px">你負責 '+mine.length+' 個項目，分在 '+new Set(mine.map(i=>i.gid)).size+' 個組別</span>';
   h+='</section>';
   if(ui.reportOk)h+='<div class="ok" role="status">'+esc(ui.reportOk)+'</div>';
-  if(!people.length)return h+'<div class="empty"><b>還沒有人要回報</b><span class="muted small">會議決議填了負責人，或在組別設定填了成員，名字就會出現在這裡。</span></div>';
+  if(!people.length)return h+'<div class="empty"><b>還沒有人要回報</b><span class="muted small">會議決議填了負責人，名字就會出現在這裡。</span></div>';
   if(!who)return h+'<div class="empty"><b>先選你的名字</b></div>';
   if(!mine.length)return h+'<div class="empty"><b>目前沒有需要回報的項目</b><span class="muted small">會議決議裡，負責人填你名字的事情，會自動出現在這裡。</span></div>';
   h+=mine.map(it=>{
