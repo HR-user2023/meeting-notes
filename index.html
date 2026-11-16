@@ -59,6 +59,8 @@ select.in{padding:0 8px}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .full{grid-column:1/-1}
+.span2{grid-column:span 2}
+.in[type=date]{-webkit-appearance:none;appearance:none;min-width:0;display:block;line-height:42px}
 .pill{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap;border:1px solid var(--line-strong);color:var(--muted);background:transparent}
 .pill.soft{background:var(--soft);color:var(--fg);border-color:transparent}
 .pill.ink{background:var(--ink);color:var(--on-ink);border-color:transparent}
@@ -156,12 +158,24 @@ table.t td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:t
   .cards4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .grid3,.rp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .dec-head{display:none}
-  .dec{grid-template-columns:repeat(2,minmax(0,1fr)) 44px}
+  .dec{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 44px}
   .dec .d-text{grid-column:1/3}
   .dec .d-del{grid-row:1;grid-column:3}
-  .dec .d-type{grid-column:1/3}
+  .dec .d-due{grid-column:1/2}
+  .dec .d-own{grid-column:2/4}
+  .dec .d-type{grid-column:1/-1}
+  .dec .in[type=date]{padding:0 8px}
 }
-@media (max-width:440px){.grid2,.grid3,.rp-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:440px){.grid2,.grid3,.rp-grid{grid-template-columns:minmax(0,1fr)}.span2{grid-column:1/-1}}
+@media (max-width:760px){
+  .in,select.in,textarea.in{font-size:16px}
+  .top{position:static}
+  .top-in{gap:8px}
+  .cnow{display:none}
+  .top .btn{min-height:40px;padding:0 12px}
+  .hide-sm{display:none}
+  h1{font-size:23px}
+}
 /* 下載圖片用的版面：固定白底，不跟深色模式 */
 #shotHost{position:fixed;left:-20000px;top:0}
 .shot{width:750px;background:#FFFFFF;color:#171717;font-family:"Noto Sans TC","Inter",sans-serif;padding:44px 44px 30px;display:flex;flex-direction:column;gap:24px;line-height:1.55}
@@ -210,8 +224,8 @@ table.t td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:t
   <nav class="crumbs" id="crumbs" aria-label="目前位置"></nav>
   <div class="row">
     <span class="sync" id="sync" role="status"></span>
-    <a class="btn btn-line" href="#new" id="topNew">＋ 新增會議記錄</a>
-    <a class="btn btn-ink" href="#report" id="topReport">✎ 我要回報進度</a>
+    <a class="btn btn-line" href="#new" id="topNew">＋ 新增<span class="hide-sm">會議記錄</span></a>
+    <a class="btn btn-ink" href="#report" id="topReport">✎ <span class="hide-sm">我要</span>回報進度</a>
   </div>
 </div></header>
 <main id="app"><div class="empty"><b>正在載入會議記錄…</b><span class="muted small">稍等一下，資料讀取中。</span></div></main>
@@ -431,7 +445,7 @@ window.addEventListener('hashchange',()=>{
 /* ---------- render ---------- */
 function crumbs(parts){
   const brand='<a class="brand" href="#home"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>會議記錄</a>';
-  document.getElementById('crumbs').innerHTML=brand+parts.map(p=>'<span class="sep" aria-hidden="true">/</span>'+(p.href?'<a class="crumb" href="'+p.href+'">'+esc(p.t)+'</a>':'<span class="crumb now">'+esc(p.t)+'</span>')).join('');
+  document.getElementById('crumbs').innerHTML=brand+parts.map(p=>p.href?'<span class="sep" aria-hidden="true">/</span><a class="crumb" href="'+p.href+'">'+esc(p.t)+'</a>':'<span class="cnow"><span class="sep" aria-hidden="true">/</span> <span class="crumb now">'+esc(p.t)+'</span></span>').join('');
 }
 function render(){
   const r=route();
@@ -572,7 +586,7 @@ function viewNew(g){
     '<div class="field"><label for="n-date">日期</label><input id="n-date" type="date" class="in" data-draft="date" value="'+esc(d.date)+'"></div>'+
     '<div class="field"><label for="n-time">時間</label><input id="n-time" class="in" data-draft="time" value="'+esc(d.time)+'" placeholder="09:00–10:00"></div>'+
     '<div class="field"><label for="n-place">地點</label><input id="n-place" class="in" data-draft="place" value="'+esc(d.place)+'"></div>'+
-    '<div class="field" style="grid-column:span 2"><label for="n-att">參加者</label><input id="n-att" class="in" data-draft="attendees" value="'+esc(d.attendees)+'"></div>'+
+    '<div class="field span2"><label for="n-att">參加者</label><input id="n-att" class="in" data-draft="attendees" value="'+esc(d.attendees)+'"></div>'+
     '<div class="field"><label for="n-rec">記錄人</label><input id="n-rec" class="in" data-draft="recorder" value="'+esc(d.recorder)+'"></div></div></section>';
   h+='<section class="panel"><div class="panel-head"><div class="t"><h2>3. 議題</h2><span class="small muted">'+(d.topics.length?'共 '+d.topics.length+' 個':'這場會議要討論什麼？在下面新增，也可以開會時再加')+'</span></div></div>';
   if(d.topics.length)h+='<ul class="chips">'+d.topics.map((t,i)=>'<li><span><b class="num">'+(i+1)+'.</b> '+esc(t.title)+'</span><button class="icon-btn" aria-label="刪除議題 '+esc(t.title)+'" data-act="draft-del" data-i="'+i+'">✕</button></li>').join('')+'</ul>';
@@ -606,7 +620,7 @@ function viewMeeting(){
     '<div class="field"><label for="m-date">日期</label><input id="m-date" type="date" class="in" data-bind="date" data-rerender value="'+esc(m.date)+'"></div>'+
     '<div class="field"><label for="m-time">時間</label><input id="m-time" class="in" data-bind="time" value="'+esc(m.time)+'"></div>'+
     '<div class="field"><label for="m-place">地點</label><input id="m-place" class="in" data-bind="place" value="'+esc(m.place)+'"></div>'+
-    '<div class="field" style="grid-column:span 2"><label for="m-att">參加者</label><input id="m-att" class="in" data-bind="attendees" value="'+esc(m.attendees)+'"></div>'+
+    '<div class="field span2"><label for="m-att">參加者</label><input id="m-att" class="in" data-bind="attendees" value="'+esc(m.attendees)+'"></div>'+
     '<div class="field"><label for="m-rec">記錄人</label><input id="m-rec" class="in" data-bind="recorder" value="'+esc(m.recorder)+'"></div>'+
     (groups().length>1||g.virtual?'<div class="field"><label for="m-group">組別</label><select id="m-group" class="in" data-bind="groupId" data-rerender>'+(g.virtual?'<option value="">未分組</option>':'')+opts(groups().map(x=>({v:x.id,l:x.name})),m.groupId)+'</select></div>':'')+
     '</div></section>';
@@ -630,8 +644,8 @@ function viewMeeting(){
     decs.forEach((d,i)=>{
       const tracked=names(d.owner).length>0;
       h+='<div class="dec"><div class="d-text"><label class="sr" for="dt-'+d.id+'">決議內容</label><input id="dt-'+d.id+'" class="in" data-bind="decisions.'+i+'.text" value="'+esc(d.text)+'" placeholder="決議或待辦內容"></div>'+
-        '<div><label class="sr" for="dd-'+d.id+'">時間安排</label><input id="dd-'+d.id+'" type="date" class="in" data-bind="decisions.'+i+'.due" value="'+esc(d.due)+'"></div>'+
-        '<div><label class="sr" for="do-'+d.id+'">負責人</label><input id="do-'+d.id+'" class="in" list="people" data-bind="decisions.'+i+'.owner" data-type-of="'+d.id+'" value="'+esc(d.owner)+'" placeholder="負責人"></div>'+
+        '<div class="d-due"><label class="sr" for="dd-'+d.id+'">時間安排</label><input id="dd-'+d.id+'" type="date" class="in" data-bind="decisions.'+i+'.due" value="'+esc(d.due)+'"></div>'+
+        '<div class="d-own"><label class="sr" for="do-'+d.id+'">負責人</label><input id="do-'+d.id+'" class="in" list="people" data-bind="decisions.'+i+'.owner" data-type-of="'+d.id+'" value="'+esc(d.owner)+'" placeholder="負責人"></div>'+
         '<div class="d-type" id="ty-'+d.id+'">'+(tracked?'<span class="pill soft">進度追蹤</span>':'<span class="pill">只記錄決議</span>')+'</div>'+
         '<button class="icon-btn d-del" aria-label="刪除這條決議" data-act="del-dec" data-i="'+i+'">✕</button></div>';
     });
